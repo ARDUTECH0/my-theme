@@ -158,17 +158,18 @@ class ECM_Widget_Slider_3D extends \Elementor\Widget_Base {
             'default'      => '',
         ] );
         $this->add_control( 'zoom', [
-            'label'        => __( 'زوم بالماوس/الإصبع', 'ecm-theme' ),
+            'label'        => __( 'زوم بعجلة الماوس/الإصبع', 'ecm-theme' ),
             'type'         => \Elementor\Controls_Manager::SWITCHER,
             'return_value' => 'yes',
-            'default'      => '',
+            'default'      => 'yes',
+            'description'  => __( 'قف على الموديل ولفّ عجلة الماوس عشان تقرّب/تبعّد.', 'ecm-theme' ),
         ] );
         $this->add_control( 'zoom_buttons', [
             'label'        => __( 'أزرار زوم (+/−)', 'ecm-theme' ),
             'type'         => \Elementor\Controls_Manager::SWITCHER,
             'return_value' => 'yes',
-            'default'      => 'yes',
-            'description'  => __( 'أزرار تقريب/تبعيد للموديل 3D فوق السلايدر.', 'ecm-theme' ),
+            'default'      => '',
+            'description'  => __( 'أزرار تقريب/تبعيد إضافية فوق السلايدر (اختياري).', 'ecm-theme' ),
         ] );
         $this->add_control( 'model_size', [
             'label'   => __( 'حجم الموديل داخل الإطار', 'ecm-theme' ),
