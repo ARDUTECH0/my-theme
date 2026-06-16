@@ -5,22 +5,66 @@
 (function () {
     'use strict';
 
-    // إعادة تأطير موديل 3D واحد (يوسّطه ويفتّحه صح)
+    // إعادة تأطير موديل 3D واحد (يوسّطه ويفتّحه صح — حتى لو نفس الملف متكرّر)
     function reframeModel( mv ) {
         if ( ! mv ) { return; }
+        try { mv.cameraTarget = 'auto auto auto'; } catch ( e ) {}
         try { if ( typeof mv.updateFraming === 'function' ) { mv.updateFraming(); } } catch ( e ) {}
+        try { if ( typeof mv.jumpCameraToGoal === 'function' ) { mv.jumpCameraToGoal(); } } catch ( e ) {}
     }
 
     // إعادة تأطير كل الموديلات في الصفحة + ربط حدث التحميل لكل واحد
+    // تشغيل كل الأنيميشنز في الملف بالتتابع (model-viewer بيشغّل واحد في المرة)
+    function setupAnims( mv ) {
+        if ( ! mv.hasAttribute( 'autoplay' ) || mv.dataset.ecmAnimBound ) { return; }
+        mv.dataset.ecmAnimBound = '1';
+
+        function setup() {
+            var anims = mv.availableAnimations || [];
+            if ( anims.length < 2 ) { return; } // أنيميشن واحد → autoplay بيكرّره عادي
+            mv.removeAttribute( 'autoplay' );
+            var i = 0;
+            function playClip() {
+                mv.animationName = anims[ i ];
+                try { mv.play( { repetitions: 1 } ); } catch ( e ) { try { mv.play(); } catch ( e2 ) {} }
+            }
+            mv.addEventListener( 'finished', function () {
+                i = ( i + 1 ) % anims.length;
+                playClip();
+            } );
+            playClip();
+        }
+
+        if ( mv.loaded ) { setup(); }
+        else { mv.addEventListener( 'load', setup ); }
+    }
+
     function reframeAll() {
         var mvs = document.querySelectorAll( 'model-viewer' );
         Array.prototype.forEach.call( mvs, function ( mv ) {
             reframeModel( mv );
+            setupAnims( mv );
             if ( ! mv.dataset.ecmFrameBound ) {
                 mv.dataset.ecmFrameBound = '1';
                 mv.addEventListener( 'load', function () { reframeModel( mv ); } );
             }
         } );
+    }
+
+    // الموديل في الشريحة النشطة
+    function activeModel( root ) {
+        var slide = root.querySelector( '.ecm-slider-3d__slide.is-active' );
+        return slide ? slide.querySelector( 'model-viewer' ) : null;
+    }
+
+    // زوم للموديل النشط — dir سالب = تقريب، موجب = تبعيد
+    function zoomModel( mv, dir ) {
+        if ( ! mv ) { return; }
+        var fov = 30;
+        try { fov = parseFloat( mv.getFieldOfView() ); } catch ( e ) {}
+        if ( ! fov || isNaN( fov ) ) { fov = 30; }
+        fov = Math.max( 8, Math.min( 55, fov + dir * 5 ) );
+        try { mv.fieldOfView = fov + 'deg'; } catch ( e ) {}
     }
 
     function initSlider( root ) {
@@ -31,6 +75,9 @@
         var dots   = root.querySelectorAll( '.ecm-slider-3d__dot' );
         var prev   = root.querySelector( '.ecm-slider-3d__prev' );
         var next   = root.querySelector( '.ecm-slider-3d__next' );
+        var zin    = root.querySelector( '.ecm-slider-3d__zoom-in' );
+        var zout   = root.querySelector( '.ecm-slider-3d__zoom-out' );
+        var zreset = root.querySelector( '.ecm-slider-3d__zoom-reset' );
         if ( slides.length < 1 ) { return; }
 
         var current = 0;
@@ -62,6 +109,9 @@
 
         if ( next ) { next.addEventListener( 'click', function () { go( current + 1 ); restart(); } ); }
         if ( prev ) { prev.addEventListener( 'click', function () { go( current - 1 ); restart(); } ); }
+        if ( zin ) { zin.addEventListener( 'click', function () { zoomModel( activeModel( root ), -1 ); } ); }
+        if ( zout ) { zout.addEventListener( 'click', function () { zoomModel( activeModel( root ), 1 ); } ); }
+        if ( zreset ) { zreset.addEventListener( 'click', function () { reframeModel( activeModel( root ) ); } ); }
         Array.prototype.forEach.call( dots, function ( d ) {
             d.addEventListener( 'click', function () { go( parseInt( d.getAttribute( 'data-i' ), 10 ) || 0 ); restart(); } );
         } );

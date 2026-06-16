@@ -4,7 +4,7 @@ Theme URI:   https://ecameraman.com
 Author:      E.Camera.Man
 Author URI:  https://ecameraman.com
 Description: ثيم احترافي لموقع ECM — E.Camera.Man مع دعم Elementor كامل
-Version:     3.0.3
+Version:     3.0.4
 License:     GNU General Public License v2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Text Domain: ecm-theme
@@ -1484,6 +1484,42 @@ html { direction: rtl; }
   border-radius: 6px;
   box-shadow: 0 0 10px var(--ecm-green-glow);
 }
+
+/* أزرار زوم الموديل 3D */
+.ecm-slider-3d__zoom {
+  position: absolute;
+  bottom: 18px;
+  inset-inline-end: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 6;
+}
+.ecm-slider-3d__zoom-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(13,14,17,0.55);
+  border: 1px solid var(--ecm-border);
+  color: var(--ecm-white);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+}
+.ecm-slider-3d__zoom-btn:hover {
+  background: var(--ecm-green);
+  color: #0d0e11;
+  border-color: var(--ecm-green);
+  transform: translateY(-1px);
+}
+.ecm-slider-3d__zoom-reset { font-size: 17px; }
 
 /* ملء عرض الشاشة — بدون حواف مدوّرة */
 .ecm-slider-3d--full {

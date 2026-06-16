@@ -106,6 +106,7 @@ function ecm_3d_model_markup( $args = [] ) {
     $effect_class = $effect ? ' ecm-3d-' . $effect : '';
 
     $attrs = [ 'interaction-prompt="none"' ];
+    $attrs[] = 'camera-target="auto auto auto"'; // توسيط الموديل على مركزه
     $attrs[] = 'loading="' . esc_attr( $args['loading'] ) . '"';
     $attrs[] = 'exposure="' . floatval( $args['exposure'] ) . '"';
     $attrs[] = 'shadow-intensity="' . floatval( $args['shadow'] ) . '"';

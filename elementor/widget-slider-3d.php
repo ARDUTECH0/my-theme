@@ -158,10 +158,17 @@ class ECM_Widget_Slider_3D extends \Elementor\Widget_Base {
             'default'      => '',
         ] );
         $this->add_control( 'zoom', [
-            'label'        => __( 'زوم بالماوس', 'ecm-theme' ),
+            'label'        => __( 'زوم بالماوس/الإصبع', 'ecm-theme' ),
             'type'         => \Elementor\Controls_Manager::SWITCHER,
             'return_value' => 'yes',
             'default'      => '',
+        ] );
+        $this->add_control( 'zoom_buttons', [
+            'label'        => __( 'أزرار زوم (+/−)', 'ecm-theme' ),
+            'type'         => \Elementor\Controls_Manager::SWITCHER,
+            'return_value' => 'yes',
+            'default'      => 'yes',
+            'description'  => __( 'أزرار تقريب/تبعيد للموديل 3D فوق السلايدر.', 'ecm-theme' ),
         ] );
         $this->add_control( 'model_size', [
             'label'   => __( 'حجم الموديل داخل الإطار', 'ecm-theme' ),
@@ -256,6 +263,19 @@ class ECM_Widget_Slider_3D extends \Elementor\Widget_Base {
             foreach ( $slides as $i => $slide ) {
                 echo '<button type="button" class="ecm-slider-3d__dot' . ( 0 === $i ? ' is-active' : '' ) . '" data-i="' . (int) $i . '" aria-label="' . esc_attr( sprintf( __( 'شريحة %d', 'ecm-theme' ), $i + 1 ) ) . '"></button>';
             }
+            echo '</div>';
+        }
+
+        // أزرار زوم للموديل 3D (تظهر فقط لو فيه شريحة فيها glb)
+        $has_glb = false;
+        foreach ( $slides as $slide ) {
+            if ( ! empty( $slide['glb_url'] ) && '' !== trim( $slide['glb_url'] ) ) { $has_glb = true; break; }
+        }
+        if ( $has_glb && 'yes' === ( $s['zoom_buttons'] ?? 'yes' ) ) {
+            echo '<div class="ecm-slider-3d__zoom">';
+            echo '<button type="button" class="ecm-slider-3d__zoom-btn ecm-slider-3d__zoom-in" aria-label="' . esc_attr__( 'تقريب', 'ecm-theme' ) . '">+</button>';
+            echo '<button type="button" class="ecm-slider-3d__zoom-btn ecm-slider-3d__zoom-out" aria-label="' . esc_attr__( 'تبعيد', 'ecm-theme' ) . '">&minus;</button>';
+            echo '<button type="button" class="ecm-slider-3d__zoom-btn ecm-slider-3d__zoom-reset" aria-label="' . esc_attr__( 'إرجاع', 'ecm-theme' ) . '">&#8635;</button>';
             echo '</div>';
         }
 
