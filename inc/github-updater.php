@@ -15,7 +15,7 @@ defined( 'ABSPATH' ) || exit;
 
 
 // ── الإعدادات ────────────────────────────────────────────────
-function ecm_gh_repo()  { return trim( (string) get_option( 'ecm_gh_repo', '' ) ); }   // owner/repo
+function ecm_gh_repo()  { return trim( (string) get_option( 'ecm_gh_repo', 'ARDUTECH0/my-theme' ) ); }   // owner/repo
 function ecm_gh_token() { return trim( (string) get_option( 'ecm_gh_token', '' ) ); }   // اختياري (للخاص/الحدود)
 
 
