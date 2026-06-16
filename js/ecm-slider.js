@@ -5,10 +5,22 @@
 (function () {
     'use strict';
 
-    // إعادة تأطير موديل 3D واحد (يوسّطه ويفتّحه صح — حتى لو نفس الملف متكرّر)
+    // إعادة تأطير موديل 3D واحد (يوسّطه في النص بالظبط — حتى لو نفس الملف متكرّر)
     function reframeModel( mv ) {
         if ( ! mv ) { return; }
-        try { mv.cameraTarget = 'auto auto auto'; } catch ( e ) {}
+        // وجّه الكاميرا لمركز صندوق الموديل الحقيقي (أدقّ من "auto")
+        try {
+            if ( typeof mv.getBoundingBoxCenter === 'function' ) {
+                var c = mv.getBoundingBoxCenter();
+                if ( c && isFinite( c.x ) ) {
+                    mv.cameraTarget = c.x + 'm ' + c.y + 'm ' + c.z + 'm';
+                } else {
+                    mv.cameraTarget = 'auto auto auto';
+                }
+            } else {
+                mv.cameraTarget = 'auto auto auto';
+            }
+        } catch ( e ) { try { mv.cameraTarget = 'auto auto auto'; } catch ( e2 ) {} }
         try { if ( typeof mv.updateFraming === 'function' ) { mv.updateFraming(); } } catch ( e ) {}
         try { if ( typeof mv.jumpCameraToGoal === 'function' ) { mv.jumpCameraToGoal(); } } catch ( e ) {}
     }
