@@ -1,0 +1,65 @@
+/**
+ * ECM Theme — Editor Styles
+ * بيخلّي محرر الكتل (Gutenberg) يعكس شكل الموقع (داكن + خطوط ECM).
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Cairo:wght@300;400;600;700&display=swap');
+
+.editor-styles-wrapper {
+  background-color: #111214;
+  color: #b8bcc8;
+  font-family: 'Cairo', sans-serif;
+  font-size: 16px;
+  line-height: 1.8;
+}
+
+.editor-styles-wrapper h1,
+.editor-styles-wrapper h2,
+.editor-styles-wrapper h3,
+.editor-styles-wrapper h4,
+.editor-styles-wrapper h5,
+.editor-styles-wrapper h6 {
+  font-family: 'Orbitron', 'Cairo', sans-serif;
+  color: #eef0f4;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.editor-styles-wrapper a { color: #9cff00; }
+
+.editor-styles-wrapper p,
+.editor-styles-wrapper li { color: #b8bcc8; }
+
+.editor-styles-wrapper blockquote {
+  border-inline-start: 3px solid #9cff00;
+  padding-inline-start: 18px;
+  color: #b8bcc8;
+}
+
+.editor-styles-wrapper code,
+.editor-styles-wrapper pre {
+  background: #1a1d22;
+  color: #cfe8a8;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+}
+
+.editor-styles-wrapper hr {
+  border: none;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+/* عناوين المحرر */
+.editor-styles-wrapper .wp-block { max-width: 1000px; }
+
+/* الأزرار */
+.editor-styles-wrapper .wp-block-button__link {
+  background-color: #9cff00;
+  color: #0d0e11;
+  border-radius: 6px;
+  font-weight: 700;
+}
+
+/* الجداول */
+.editor-styles-wrapper table th { background: #1a1d22; color: #eef0f4; }
+.editor-styles-wrapper table td { border-color: rgba(255,255,255,0.08); }
