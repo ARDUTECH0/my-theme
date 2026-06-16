@@ -26,6 +26,12 @@
             current = i;
             if ( slides[ current ] ) { slides[ current ].classList.add( 'is-active' ); }
             if ( dots[ current ] ) { dots[ current ].classList.add( 'is-active' ); }
+            // نكزة لـ model-viewer عشان يرسم صح بعد تغيير الشريحة
+            if ( window.requestAnimationFrame ) {
+                requestAnimationFrame( function () {
+                    try { window.dispatchEvent( new Event( 'resize' ) ); } catch ( e ) {}
+                } );
+            }
         }
 
         function start() {
@@ -57,6 +63,13 @@
     } else {
         initAll();
     }
+
+    // نكزة عامة لكل موديلات 3D بعد التحميل (تتفادى مشكلة عدم الرسم مع تعدد الموديلات)
+    window.addEventListener( 'load', function () {
+        setTimeout( function () {
+            try { window.dispatchEvent( new Event( 'resize' ) ); } catch ( e ) {}
+        }, 350 );
+    } );
 
     // التشغيل داخل محرّر Elementor (لما الودجِت يتضاف/يتعدّل)
     if ( window.jQuery ) {

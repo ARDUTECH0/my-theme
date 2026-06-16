@@ -1,0 +1,15 @@
+# نظام التشغيل / المحرر
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+.vscode/
+.idea/
+
+# Node (لو فيه أدوات build)
+node_modules/
+npm-debug.log*
+
+# ملفات مؤقتة
+*.tmp
+*.bak

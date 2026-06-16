@@ -1485,6 +1485,16 @@ html { direction: rtl; }
   box-shadow: 0 0 10px var(--ecm-green-glow);
 }
 
+/* ملء عرض الشاشة — بدون حواف مدوّرة */
+.ecm-slider-3d--full {
+  width: 100vw;
+  max-width: 100vw;
+  margin-inline-start: calc(-50vw + 50%);
+  margin-inline-end: calc(-50vw + 50%);
+  border-radius: 0 !important;
+  border-inline: 0;
+}
+
 @media (max-width: 768px) {
   .ecm-slider-3d__slide { grid-template-columns: 1fr; text-align: center; gap: 14px; padding: 26px 18px 52px; }
   .ecm-slider-3d__sub { margin-inline: auto; }

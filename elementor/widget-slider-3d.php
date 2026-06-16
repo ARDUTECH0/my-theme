@@ -119,6 +119,23 @@ class ECM_Widget_Slider_3D extends \Elementor\Widget_Base {
             'default'      => 'yes',
         ] );
 
+        $this->add_control( 'full_width', [
+            'label'        => __( 'ملء عرض الشاشة', 'ecm-theme' ),
+            'type'         => \Elementor\Controls_Manager::SWITCHER,
+            'return_value' => 'yes',
+            'default'      => '',
+            'description'  => __( 'يخلّي السلايدر ياخد عرض الشاشة كله من غير حواف.', 'ecm-theme' ),
+        ] );
+
+        $this->add_control( 'radius', [
+            'label'      => __( 'استدارة الحواف', 'ecm-theme' ),
+            'type'       => \Elementor\Controls_Manager::SLIDER,
+            'range'      => [ 'px' => [ 'min' => 0, 'max' => 40 ] ],
+            'default'    => [ 'size' => 10 ],
+            'selectors'  => [ '{{WRAPPER}} .ecm-slider-3d' => 'border-radius: {{SIZE}}px;' ],
+            'condition'  => [ 'full_width!' => 'yes' ],
+        ] );
+
         $this->end_controls_section();
 
         /* ── الموديل 3D ── */
@@ -167,7 +184,10 @@ class ECM_Widget_Slider_3D extends \Elementor\Widget_Base {
 
         $autoplay = ( 'yes' === $s['autoplay'] ) ? max( 2, (int) ( $s['autoplay_delay'] ?? 6 ) ) * 1000 : 0;
         $bg_mode  = ( 'bg' === ( $s['media_side'] ?? 'start' ) );
-        $wrap_cls = 'ecm-slider-3d' . ( $bg_mode ? ' ecm-slider-3d--bg' : '' );
+        $full     = ( 'yes' === ( $s['full_width'] ?? '' ) );
+        $wrap_cls = 'ecm-slider-3d'
+            . ( $bg_mode ? ' ecm-slider-3d--bg' : '' )
+            . ( $full ? ' ecm-slider-3d--full' : '' );
 
         echo '<div class="' . esc_attr( $wrap_cls ) . '" data-autoplay="' . esc_attr( $autoplay ) . '">';
         echo '<div class="ecm-slider-3d__viewport">';
