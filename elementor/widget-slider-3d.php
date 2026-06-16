@@ -172,10 +172,11 @@ class ECM_Widget_Slider_3D extends \Elementor\Widget_Base {
             'description'  => __( 'أزرار تقريب/تبعيد إضافية فوق السلايدر (اختياري).', 'ecm-theme' ),
         ] );
         $this->add_control( 'model_size', [
-            'label'   => __( 'حجم الموديل داخل الإطار', 'ecm-theme' ),
-            'type'    => \Elementor\Controls_Manager::SLIDER,
-            'range'   => [ 'px' => [ 'min' => 40, 'max' => 160, 'step' => 5 ] ],
-            'default' => [ 'size' => 100 ],
+            'label'       => __( 'حجم الموديل (ملء الإطار %)', 'ecm-theme' ),
+            'type'        => \Elementor\Controls_Manager::SLIDER,
+            'range'       => [ 'px' => [ 'min' => 50, 'max' => 100, 'step' => 5 ] ],
+            'default'     => [ 'size' => 90 ],
+            'description' => __( 'أكبر = الموديل يملأ الإطار أكثر. 100% = أقصى حجم بدون قص.', 'ecm-theme' ),
         ] );
         $this->add_control( 'media_side', [
             'label'   => __( 'مكان الموديل', 'ecm-theme' ),
@@ -215,13 +216,17 @@ class ECM_Widget_Slider_3D extends \Elementor\Widget_Base {
             echo '<div class="ecm-slider-3d__media">';
             $glb = isset( $slide['glb_url'] ) ? trim( $slide['glb_url'] ) : '';
             if ( '' !== $glb && function_exists( 'ecm_3d_model_markup' ) ) {
+                // "ملء الإطار %" (50–100) → radius% للكاميرا. 100% ملء = 100% radius (أقصى حجم بدون قص).
+                $fill  = isset( $s['model_size']['size'] ) ? (int) $s['model_size']['size'] : 90;
+                $fill  = min( 100, max( 40, $fill ) );
+                $frame = (int) round( 10000 / $fill ); // 100→100% ، 90→111% ، 50→200%
                 echo ecm_3d_model_markup( [
                     'src'             => $glb,
                     'auto_rotate'     => 'yes' === $s['auto_rotate'],
                     'play_animation'  => 'yes' === ( $s['play_animation'] ?? 'yes' ),
                     'zoom'            => 'yes' === ( $s['zoom'] ?? '' ),
                     'camera_controls' => true,
-                    'frame_zoom'      => isset( $s['model_size']['size'] ) ? (int) $s['model_size']['size'] : 100,
+                    'frame_zoom'      => $frame,
                     'class'           => 'ecm-3d-model',
                     'inline_size'     => false,
                     'loading'         => 'lazy',

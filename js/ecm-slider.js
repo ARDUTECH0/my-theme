@@ -116,8 +116,21 @@
             d.addEventListener( 'click', function () { go( parseInt( d.getAttribute( 'data-i' ), 10 ) || 0 ); restart(); } );
         } );
 
-        root.addEventListener( 'mouseenter', stop );
-        root.addEventListener( 'mouseleave', restart );
+        // إيقاف الأوتوبلاي عند المرور أو التفاعل مع الموديل 3D
+        var isOver      = false; // الماوس فوق السلايدر
+        var interacting = false; // بيسحب/بيلفّ الموديل دلوقتي
+
+        root.addEventListener( 'mouseenter', function () { isOver = true; stop(); } );
+        root.addEventListener( 'mouseleave', function () { isOver = false; if ( ! interacting ) { restart(); } } );
+
+        // أثناء السحب (ماوس أو لمس) — model-viewer بيمسك المؤشر فبيطلّع mouseleave بالغلط؛
+        // نقفل التقدّم طول ما الإيد ماسكة، ومايرجعش غير بعد رفع الإيد + خروج الماوس.
+        root.addEventListener( 'pointerdown', function () { interacting = true; stop(); } );
+        document.addEventListener( 'pointerup', function () {
+            if ( ! interacting ) { return; }
+            interacting = false;
+            if ( ! isOver ) { restart(); }
+        } );
 
         start();
     }
