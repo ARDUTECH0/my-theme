@@ -1,0 +1,6 @@
+# سكريبتات الـ shell لازم LF (عشان Git Bash)
+*.sh text eol=lf
+
+# سكريبتات الويندوز لازم CRLF (عشان cmd.exe)
+*.bat text eol=crlf
+*.cmd text eol=crlf
