@@ -126,11 +126,11 @@ class ECM_Widget_Logo_3D extends \Elementor\Widget_Base {
         ] );
 
         $this->add_control( 'frame_zoom', [
-            'label'       => __( 'حجم الموديل داخل الإطار', 'ecm-theme' ),
+            'label'       => __( 'حجم الموديل (ملء الإطار %)', 'ecm-theme' ),
             'type'        => \Elementor\Controls_Manager::SLIDER,
-            'range'       => [ 'px' => [ 'min' => 40, 'max' => 160, 'step' => 5 ] ],
-            'default'     => [ 'size' => 100 ],
-            'description' => __( 'أقل = الموديل أكبر وأقرب · أعلى = أصغر وأبعد.', 'ecm-theme' ),
+            'range'       => [ 'px' => [ 'min' => 50, 'max' => 100, 'step' => 5 ] ],
+            'default'     => [ 'size' => 90 ],
+            'description' => __( 'أكبر = الموديل يملأ الإطار أكثر. 100% = أقصى حجم بدون قص (يفضل دايمًا متسنتر).', 'ecm-theme' ),
         ] );
 
         $this->add_responsive_control( 'align', [
@@ -241,6 +241,13 @@ class ECM_Widget_Logo_3D extends \Elementor\Widget_Base {
         $this->end_controls_section();
     }
 
+    /** "ملء الإطار %" (50–100) → radius% للكاميرا. مايقلّش عن 100% عشان الموديل مايتقصّش. */
+    private function ecm_fill_to_frame( $s ): int {
+        $fill = isset( $s['frame_zoom']['size'] ) ? (int) $s['frame_zoom']['size'] : 90;
+        $fill = min( 100, max( 40, $fill ) );
+        return (int) round( 10000 / $fill );
+    }
+
     protected function render(): void {
         if ( ! function_exists( 'ecm_3d_model_markup' ) ) {
             return;
@@ -269,7 +276,7 @@ class ECM_Widget_Logo_3D extends \Elementor\Widget_Base {
             'shadow'          => isset( $s['shadow']['size'] ) ? (float) $s['shadow']['size'] : 0.4,
             'shadow_softness' => isset( $s['shadow_softness']['size'] ) ? (float) $s['shadow_softness']['size'] : 1.0,
             'tone_mapping'    => $s['tone_mapping'] ?? 'neutral',
-            'frame_zoom'      => isset( $s['frame_zoom']['size'] ) ? (int) $s['frame_zoom']['size'] : 100,
+            'frame_zoom'      => $this->ecm_fill_to_frame( $s ),
             'class'           => 'ecm-3d-model',
             'loading'          => 'lazy',
             'inline_size'     => false, // المقاس من تحكّمات Elementor (selectors)
