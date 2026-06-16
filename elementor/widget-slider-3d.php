@@ -144,11 +144,18 @@ class ECM_Widget_Slider_3D extends \Elementor\Widget_Base {
             'tab'   => \Elementor\Controls_Manager::TAB_CONTENT,
         ] );
 
-        $this->add_control( 'auto_rotate', [
-            'label'        => __( 'دوران تلقائي', 'ecm-theme' ),
+        $this->add_control( 'play_animation', [
+            'label'        => __( 'تشغيل أنيميشن الملف', 'ecm-theme' ),
             'type'         => \Elementor\Controls_Manager::SWITCHER,
             'return_value' => 'yes',
             'default'      => 'yes',
+            'description'  => __( 'يشغّل الحركة المدمجة جوه ملف الـ glb نفسه (لو موجودة).', 'ecm-theme' ),
+        ] );
+        $this->add_control( 'auto_rotate', [
+            'label'        => __( 'دوران تلقائي (إضافي)', 'ecm-theme' ),
+            'type'         => \Elementor\Controls_Manager::SWITCHER,
+            'return_value' => 'yes',
+            'default'      => '',
         ] );
         $this->add_control( 'zoom', [
             'label'        => __( 'زوم بالماوس', 'ecm-theme' ),
@@ -203,6 +210,7 @@ class ECM_Widget_Slider_3D extends \Elementor\Widget_Base {
                 echo ecm_3d_model_markup( [
                     'src'             => $glb,
                     'auto_rotate'     => 'yes' === $s['auto_rotate'],
+                    'play_animation'  => 'yes' === ( $s['play_animation'] ?? 'yes' ),
                     'zoom'            => 'yes' === ( $s['zoom'] ?? '' ),
                     'camera_controls' => true,
                     'frame_zoom'      => isset( $s['model_size']['size'] ) ? (int) $s['model_size']['size'] : 100,
