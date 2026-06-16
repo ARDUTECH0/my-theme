@@ -5,6 +5,24 @@
 (function () {
     'use strict';
 
+    // إعادة تأطير موديل 3D واحد (يوسّطه ويفتّحه صح)
+    function reframeModel( mv ) {
+        if ( ! mv ) { return; }
+        try { if ( typeof mv.updateFraming === 'function' ) { mv.updateFraming(); } } catch ( e ) {}
+    }
+
+    // إعادة تأطير كل الموديلات في الصفحة + ربط حدث التحميل لكل واحد
+    function reframeAll() {
+        var mvs = document.querySelectorAll( 'model-viewer' );
+        Array.prototype.forEach.call( mvs, function ( mv ) {
+            reframeModel( mv );
+            if ( ! mv.dataset.ecmFrameBound ) {
+                mv.dataset.ecmFrameBound = '1';
+                mv.addEventListener( 'load', function () { reframeModel( mv ); } );
+            }
+        } );
+    }
+
     function initSlider( root ) {
         if ( ! root || root.dataset.ecmSliderInit ) { return; }
         root.dataset.ecmSliderInit = '1';
@@ -26,10 +44,10 @@
             current = i;
             if ( slides[ current ] ) { slides[ current ].classList.add( 'is-active' ); }
             if ( dots[ current ] ) { dots[ current ].classList.add( 'is-active' ); }
-            // نكزة لـ model-viewer عشان يرسم صح بعد تغيير الشريحة
-            if ( window.requestAnimationFrame ) {
+            // إعادة تأطير موديل الشريحة النشطة عشان يبقى متسنطر صح
+            if ( window.requestAnimationFrame && slides[ current ] ) {
                 requestAnimationFrame( function () {
-                    try { window.dispatchEvent( new Event( 'resize' ) ); } catch ( e ) {}
+                    reframeModel( slides[ current ].querySelector( 'model-viewer' ) );
                 } );
             }
         }
@@ -64,12 +82,18 @@
         initAll();
     }
 
-    // نكزة عامة لكل موديلات 3D بعد التحميل (تتفادى مشكلة عدم الرسم مع تعدد الموديلات)
-    window.addEventListener( 'load', function () {
-        setTimeout( function () {
-            try { window.dispatchEvent( new Event( 'resize' ) ); } catch ( e ) {}
-        }, 350 );
-    } );
+    // إعادة تأطير كل موديلات 3D (توسيط صحيح حتى مع تعدد الموديلات في الصفحة)
+    function reframeBurst() {
+        reframeAll();
+        setTimeout( reframeAll, 600 );
+        setTimeout( reframeAll, 1600 );
+    }
+    if ( document.readyState === 'loading' ) {
+        document.addEventListener( 'DOMContentLoaded', reframeBurst );
+    } else {
+        reframeBurst();
+    }
+    window.addEventListener( 'load', reframeBurst );
 
     // التشغيل داخل محرّر Elementor (لما الودجِت يتضاف/يتعدّل)
     if ( window.jQuery ) {
