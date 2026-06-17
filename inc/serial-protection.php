@@ -20,7 +20,7 @@ function ecm_serial_table(): string {
 
 // ── إنشاء/تحديث الجدول ────────────────────────────────────────
 function ecm_serials_install() {
-    if ( get_option( 'ecm_serials_db_v1' ) ) {
+    if ( get_option( 'ecm_serials_db_v2' ) ) {
         return;
     }
     global $wpdb;
@@ -35,6 +35,7 @@ function ecm_serials_install() {
         user_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
         email VARCHAR(190) NOT NULL DEFAULT '',
         token VARCHAR(64) NOT NULL DEFAULT '',
+        warranty_months INT NOT NULL DEFAULT 12,
         activated_at DATETIME NULL,
         created_at DATETIME NOT NULL,
         PRIMARY KEY  (id),
@@ -42,7 +43,7 @@ function ecm_serials_install() {
         KEY token (token)
     ) {$charset};" );
 
-    update_option( 'ecm_serials_db_v1', 1 );
+    update_option( 'ecm_serials_db_v2', 1 );
     // نحتاج flush للـ endpoint بتاع "أجهزتي"
     update_option( 'ecm_serials_flush', 1 );
 }
@@ -68,17 +69,43 @@ function ecm_serial_find_by_token( string $token ) {
     return $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . ecm_serial_table() . ' WHERE token = %s', $token ) );
 }
 
-function ecm_serial_add( string $serial ): bool {
+function ecm_serial_add( string $serial, int $warranty = 12 ): bool {
     global $wpdb;
     $serial = ecm_serial_normalize( $serial );
     if ( '' === $serial || ecm_serial_find( $serial ) ) {
         return false;
     }
     return (bool) $wpdb->insert( ecm_serial_table(), [
-        'serial'     => $serial,
-        'status'     => 'genuine',
-        'created_at' => current_time( 'mysql' ),
+        'serial'          => $serial,
+        'status'          => 'genuine',
+        'warranty_months' => max( 0, $warranty ),
+        'created_at'      => current_time( 'mysql' ),
     ] );
+}
+
+/** هل المستخدم عنده جهاز مفعّل؟ */
+function ecm_user_has_active_device( int $user_id ): bool {
+    if ( ! $user_id ) {
+        return false;
+    }
+    global $wpdb;
+    return (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . ecm_serial_table() . ' WHERE user_id = %d', $user_id ) ) > 0;
+}
+
+/** أحدث سيريال مفعّل للمستخدم (أو '') */
+function ecm_user_primary_serial( int $user_id ): string {
+    if ( ! $user_id ) {
+        return '';
+    }
+    global $wpdb;
+    $s = $wpdb->get_var( $wpdb->prepare( 'SELECT serial FROM ' . ecm_serial_table() . ' WHERE user_id = %d ORDER BY activated_at DESC LIMIT 1', $user_id ) );
+    return $s ? (string) $s : '';
+}
+
+/** رابط صفحة تفعيل الجهاز */
+function ecm_activation_page_url(): string {
+    $page = function_exists( 'ecm_page_by_title' ) ? ecm_page_by_title( 'تفعيل الجهاز' ) : null;
+    return $page ? get_permalink( $page->ID ) : home_url( '/' );
 }
 
 function ecm_mask_email( string $email ): string {
@@ -138,14 +165,21 @@ function ecm_serials_admin_page() {
 
     // إضافة سيريالات
     if ( isset( $_POST['ecm_add_serials'] ) && check_admin_referer( 'ecm_serials' ) ) {
-        $lines = preg_split( '/[\r\n,]+/', (string) wp_unslash( $_POST['ecm_serials_input'] ?? '' ) );
-        $added = 0;
+        $warranty = isset( $_POST['ecm_warranty'] ) ? max( 0, (int) $_POST['ecm_warranty'] ) : 12;
+        $lines    = preg_split( '/[\r\n,]+/', (string) wp_unslash( $_POST['ecm_serials_input'] ?? '' ) );
+        $added    = 0;
         foreach ( $lines as $line ) {
-            if ( ecm_serial_add( sanitize_text_field( $line ) ) ) {
+            if ( ecm_serial_add( sanitize_text_field( $line ), $warranty ) ) {
                 $added++;
             }
         }
-        echo '<div class="notice notice-success"><p>' . sprintf( esc_html__( 'تم إضافة %d سيريال.', 'ecm-theme' ), (int) $added ) . '</p></div>';
+        echo '<div class="notice notice-success"><p>' . sprintf( esc_html__( 'تم إضافة %1$d سيريال بضمان %2$d شهر.', 'ecm-theme' ), (int) $added, (int) $warranty ) . '</p></div>';
+    }
+
+    // تعديل مدة الضمان لجهاز
+    if ( isset( $_POST['ecm_set_warranty'], $_POST['ecm_sid'] ) && check_admin_referer( 'ecm_serials' ) ) {
+        $wpdb->update( $table, [ 'warranty_months' => max( 0, (int) $_POST['ecm_warranty_val'] ) ], [ 'id' => (int) $_POST['ecm_sid'] ] );
+        echo '<div class="notice notice-success"><p>' . esc_html__( 'تم تحديث مدة الضمان.', 'ecm-theme' ) . '</p></div>';
     }
 
     // فك ربط
@@ -167,6 +201,11 @@ function ecm_serials_admin_page() {
             <?php wp_nonce_field( 'ecm_serials' ); ?>
             <p><?php esc_html_e( 'اكتب سيريال في كل سطر (أو افصل بفاصلة):', 'ecm-theme' ); ?></p>
             <textarea name="ecm_serials_input" rows="6" style="width:100%;max-width:560px;" placeholder="ECM-0001&#10;ECM-0002"></textarea>
+            <p>
+                <label><?php esc_html_e( 'مدة الضمان (بالشهور):', 'ecm-theme' ); ?>
+                    <input type="number" name="ecm_warranty" value="12" min="0" max="120" style="width:90px;">
+                </label>
+            </p>
             <p><button class="button button-primary" name="ecm_add_serials" value="1"><?php esc_html_e( 'إضافة', 'ecm-theme' ); ?></button></p>
         </form>
 
@@ -177,6 +216,7 @@ function ecm_serials_admin_page() {
                 <th><?php esc_html_e( 'الحالة', 'ecm-theme' ); ?></th>
                 <th><?php esc_html_e( 'مربوط بـ', 'ecm-theme' ); ?></th>
                 <th><?php esc_html_e( 'تاريخ التفعيل', 'ecm-theme' ); ?></th>
+                <th><?php esc_html_e( 'الضمان (شهور)', 'ecm-theme' ); ?></th>
                 <th></th>
             </tr></thead>
             <tbody>
@@ -186,12 +226,20 @@ function ecm_serials_admin_page() {
                     <td><?php echo $r->user_id ? '🔒 ' . esc_html__( 'مفعّل', 'ecm-theme' ) : '🟢 ' . esc_html__( 'متاح', 'ecm-theme' ); ?></td>
                     <td><?php echo $r->email ? esc_html( $r->email ) : '—'; ?></td>
                     <td><?php echo $r->activated_at ? esc_html( $r->activated_at ) : '—'; ?></td>
+                    <td>
+                        <form method="post" style="display:flex;gap:4px;align-items:center;">
+                            <?php wp_nonce_field( 'ecm_serials' ); ?>
+                            <input type="hidden" name="ecm_sid" value="<?php echo (int) $r->id; ?>">
+                            <input type="number" name="ecm_warranty_val" value="<?php echo (int) ( $r->warranty_months ?? 12 ); ?>" min="0" max="120" style="width:70px;">
+                            <button class="button button-small" name="ecm_set_warranty" value="1"><?php esc_html_e( 'حفظ', 'ecm-theme' ); ?></button>
+                        </form>
+                    </td>
                     <td><?php if ( $r->user_id ) : ?>
                         <a class="button button-small" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin.php?page=ecm-serials&unbind=' . $r->id ), 'ecm_unbind_' . $r->id ) ); ?>" onclick="return confirm('فك ربط الجهاز؟');"><?php esc_html_e( 'فك الربط', 'ecm-theme' ); ?></a>
                     <?php endif; ?></td>
                 </tr>
             <?php endforeach; else : ?>
-                <tr><td colspan="5"><?php esc_html_e( 'لا يوجد سيريالات بعد.', 'ecm-theme' ); ?></td></tr>
+                <tr><td colspan="6"><?php esc_html_e( 'لا يوجد سيريالات بعد.', 'ecm-theme' ); ?></td></tr>
             <?php endif; ?>
             </tbody>
         </table>
@@ -342,16 +390,11 @@ add_action( 'woocommerce_account_my-devices_endpoint', function () {
 
     <?php if ( $rows ) : ?>
         <div class="ecm-devices-grid">
-            <?php foreach ( $rows as $r ) :
-                $verify = add_query_arg( 'token', $r->token, rest_url( 'ecm/v1/verify' ) ); ?>
+            <?php foreach ( $rows as $r ) : ?>
                 <div class="ecm-device-card">
                     <div class="ecm-device-info">
                         <span class="ecm-device-serial"><?php echo esc_html( $r->serial ); ?></span>
                         <span class="ecm-device-status">🔒 <?php esc_html_e( 'مربوط بحسابك', 'ecm-theme' ); ?></span>
-                    </div>
-                    <div class="ecm-qr-cell">
-                        <div class="ecm-qr" data-qr="<?php echo esc_attr( $verify ); ?>"></div>
-                        <span class="ecm-qr-cap">📱 <?php esc_html_e( 'كود التفعيل', 'ecm-theme' ); ?></span>
                     </div>
                 </div>
             <?php endforeach; ?>
@@ -436,9 +479,9 @@ add_shortcode( 'ecm_device_activation', function () {
 
     echo '<h4 class="ecm-activate-sub">' . esc_html__( 'أجهزتك المفعّلة', 'ecm-theme' ) . '</h4>';
     if ( $rows ) {
-        $warr_m = ecm_warranty_months();
         echo '<div class="ecm-act-devices">';
         foreach ( $rows as $r ) {
+            $warr_m   = (int) ( $r->warranty_months ?? 12 );
             $act_ts   = $r->activated_at ? strtotime( $r->activated_at ) : time();
             $dur      = ecm_duration_ar( $act_ts );
             $warr_end = strtotime( '+' . $warr_m . ' months', $act_ts );
@@ -448,6 +491,7 @@ add_shortcode( 'ecm_device_activation', function () {
             echo '<ul class="ecm-act-meta">';
             echo '<li>📅 ' . esc_html__( 'تاريخ التفعيل:', 'ecm-theme' ) . ' <strong>' . esc_html( date_i18n( 'Y/m/d', $act_ts ) ) . '</strong></li>';
             echo '<li>⏳ ' . esc_html__( 'مسجّل من:', 'ecm-theme' ) . ' <strong>' . esc_html( $dur ) . '</strong></li>';
+            echo '<li>🗓️ ' . esc_html__( 'مدة الضمان:', 'ecm-theme' ) . ' <strong>' . (int) $warr_m . ' ' . esc_html__( 'شهر', 'ecm-theme' ) . '</strong></li>';
             if ( $valid ) {
                 echo '<li class="ecm-warr-ok">🛡️ ' . esc_html__( 'الضمان ساري حتى:', 'ecm-theme' ) . ' <strong>' . esc_html( date_i18n( 'Y/m/d', $warr_end ) ) . '</strong></li>';
             } else {
@@ -517,13 +561,131 @@ function ecm_rest_verify_device( $request ) {
     // صالح = أصلي + مربوط + (لو اتبعت إيميل لازم يطابق)
     $valid = $genuine && $bound && ( null === $match ? true : $match );
 
+    $warr_m   = (int) ( $row->warranty_months ?? 12 );
+    $act_ts   = $row->activated_at ? strtotime( $row->activated_at ) : 0;
+    $warr_end = $act_ts ? strtotime( '+' . $warr_m . ' months', $act_ts ) : 0;
+
     return rest_ensure_response( [
-        'ok'      => (bool) $valid,
-        'genuine' => (bool) $genuine,
-        'bound'   => (bool) $bound,
-        'match'   => $match,
-        'email'   => $bound ? ecm_mask_email( $row->email ) : '',
-        'serial'  => $row->serial,
-        'message' => $valid ? 'تم التحقق ✅' : ( ! $genuine ? 'غير أصلي' : ( ! $bound ? 'غير مربوط بعد' : 'الجهاز مربوط بحساب آخر' ) ),
+        'ok'             => (bool) $valid,
+        'genuine'        => (bool) $genuine,
+        'bound'          => (bool) $bound,
+        'match'          => $match,
+        'email'          => $bound ? ecm_mask_email( $row->email ) : '',
+        'serial'         => $row->serial,
+        'activated_at'   => $row->activated_at,
+        'warranty_months'=> $warr_m,
+        'warranty_until' => $warr_end ? date_i18n( 'Y-m-d', $warr_end ) : '',
+        'warranty_valid' => $warr_end ? ( time() < $warr_end ) : false,
+        'message'        => $valid ? 'تم التحقق ✅' : ( ! $genuine ? 'غير أصلي' : ( ! $bound ? 'غير مربوط بعد' : 'الجهاز مربوط بحساب آخر' ) ),
+    ] );
+}
+
+
+// ════════════════════════════════════════════════════════════
+// §  بوابة الشراء — ممنوع الشراء قبل تفعيل جهاز
+// ════════════════════════════════════════════════════════════
+
+/** منع إضافة المنتج للسلة قبل تفعيل جهاز */
+add_filter( 'woocommerce_add_to_cart_validation', function ( $passed ) {
+    if ( ! is_user_logged_in() ) {
+        return $passed; // الدخول إجباري أصلًا عند الدفع
+    }
+    if ( ! ecm_user_has_active_device( get_current_user_id() ) ) {
+        wc_add_notice(
+            sprintf(
+                '🛡️ ' . __( 'لازم تسجّل جهازك الأول عشان تقدر تشتري. %sفعّل جهازك الآن%s', 'ecm-theme' ),
+                '<a href="' . esc_url( ecm_activation_page_url() ) . '"><strong>',
+                '</strong></a>'
+            ),
+            'error'
+        );
+        return false;
+    }
+    return $passed;
+}, 10, 1 );
+
+/** منع الوصول للدفع قبل تفعيل جهاز */
+add_action( 'template_redirect', function () {
+    if ( ! function_exists( 'is_checkout' ) || ! is_checkout() || is_wc_endpoint_url( 'order-received' ) ) {
+        return;
+    }
+    if ( is_user_logged_in() && ! ecm_user_has_active_device( get_current_user_id() ) ) {
+        wc_add_notice( '🛡️ ' . __( 'لازم تسجّل جهازك الأول قبل إتمام الشراء.', 'ecm-theme' ), 'error' );
+        wp_safe_redirect( ecm_activation_page_url() );
+        exit;
+    }
+} );
+
+/** بانر تنبيه في صفحات المتجر لو الجهاز مش مفعّل */
+add_action( 'woocommerce_before_main_content', function () {
+    if ( ! is_user_logged_in() ) {
+        return;
+    }
+    if ( ecm_user_has_active_device( get_current_user_id() ) ) {
+        return;
+    }
+    if ( ! ( is_shop() || is_product() || is_product_category() || is_cart() ) ) {
+        return;
+    }
+    echo '<div class="ecm-activate-banner">🛡️ '
+        . esc_html__( 'لازم تسجّل جهازك الأول عشان تقدر تشتري.', 'ecm-theme' )
+        . ' <a href="' . esc_url( ecm_activation_page_url() ) . '">' . esc_html__( 'فعّل جهازك الآن ←', 'ecm-theme' ) . '</a></div>';
+}, 5 );
+
+
+// ════════════════════════════════════════════════════════════
+// §  API — عرض الأجهزة المسجّلة (للأدمن فقط)
+// ════════════════════════════════════════════════════════════
+add_action( 'rest_api_init', function () {
+    register_rest_route( 'ecm/v1', '/devices', [
+        'methods'             => 'GET',
+        'callback'            => 'ecm_rest_list_devices',
+        'permission_callback' => function () {
+            return current_user_can( 'manage_woocommerce' );
+        },
+    ] );
+} );
+
+function ecm_rest_list_devices( $request ) {
+    global $wpdb;
+    $only_bound = (int) $request->get_param( 'bound' ); // bound=1 يرجّع المفعّل بس
+    $search     = sanitize_text_field( (string) $request->get_param( 'search' ) );
+    $limit      = min( 500, max( 1, (int) ( $request->get_param( 'limit' ) ?: 100 ) ) );
+
+    $where = '1=1';
+    $args  = [];
+    if ( $only_bound ) {
+        $where .= ' AND user_id > 0';
+    }
+    if ( '' !== $search ) {
+        $where .= ' AND (serial LIKE %s OR email LIKE %s)';
+        $like   = '%' . $wpdb->esc_like( $search ) . '%';
+        $args[] = $like;
+        $args[] = $like;
+    }
+    $sql  = "SELECT id, serial, status, user_id, email, warranty_months, activated_at, created_at FROM " . ecm_serial_table() . " WHERE {$where} ORDER BY id DESC LIMIT %d";
+    $args[] = $limit;
+    $rows = $wpdb->get_results( $wpdb->prepare( $sql, $args ) );
+
+    $out = [];
+    foreach ( (array) $rows as $r ) {
+        $warr_m   = (int) $r->warranty_months;
+        $act_ts   = $r->activated_at ? strtotime( $r->activated_at ) : 0;
+        $warr_end = $act_ts ? strtotime( '+' . $warr_m . ' months', $act_ts ) : 0;
+        $out[]    = [
+            'serial'         => $r->serial,
+            'activated'      => ( (int) $r->user_id > 0 ),
+            'email'          => $r->email,
+            'user_id'        => (int) $r->user_id,
+            'warranty_months'=> $warr_m,
+            'activated_at'   => $r->activated_at,
+            'warranty_until' => $warr_end ? date_i18n( 'Y-m-d', $warr_end ) : '',
+            'warranty_valid' => $warr_end ? ( time() < $warr_end ) : false,
+        ];
+    }
+
+    return rest_ensure_response( [
+        'count'   => count( $out ),
+        'devices' => $out,
     ] );
 }

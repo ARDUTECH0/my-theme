@@ -36,9 +36,25 @@ add_action( 'woocommerce_account_downloads_column_download-qr', function ( $down
         echo '—';
         return;
     }
+    // السيريال (جهاز المستخدم المفعّل) + اسم المنتج جوه الـ QR
+    $serial  = function_exists( 'ecm_user_primary_serial' ) ? ecm_user_primary_serial( get_current_user_id() ) : '';
+    $product = $download['product_name'] ?? '';
+    $url     = $download['download_url'];
+    if ( $serial ) {
+        $url = add_query_arg( 'serial', rawurlencode( $serial ), $url );
+    }
+    if ( $product ) {
+        $url = add_query_arg( 'product', rawurlencode( $product ), $url );
+    }
+
+    $caption = '📱 ' . ( $product ? $product : __( 'امسح بالتطبيق', 'ecm-theme' ) );
+    if ( $serial ) {
+        $caption .= ' · ' . $serial;
+    }
+
     echo '<div class="ecm-qr-cell">';
-    echo '<div class="ecm-qr" data-qr="' . esc_attr( $download['download_url'] ) . '"></div>';
-    echo '<span class="ecm-qr-cap">📱 ' . esc_html__( 'امسح بالتطبيق', 'ecm-theme' ) . '</span>';
+    echo '<div class="ecm-qr" data-qr="' . esc_attr( $url ) . '"></div>';
+    echo '<span class="ecm-qr-cap">' . esc_html( $caption ) . '</span>';
     echo '</div>';
 } );
 

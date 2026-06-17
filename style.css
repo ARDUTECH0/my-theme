@@ -4,7 +4,7 @@ Theme URI:   https://ecameraman.com
 Author:      E.Camera.Man
 Author URI:  https://ecameraman.com
 Description: ثيم احترافي لموقع ECM — E.Camera.Man مع دعم Elementor كامل
-Version:     3.0.30
+Version:     3.0.31
 License:     GNU General Public License v2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Text Domain: ecm-theme
@@ -4746,6 +4746,19 @@ body.admin-bar #ecm-header {
   padding: 14px 16px; background: rgba(255,77,77,0.08);
   border: 1px solid #ff4d4d; color: #ffd5d5;
 }
+
+/* ── بانر تفعيل الجهاز في المتجر ── */
+.ecm-activate-banner {
+  background: rgba(255,77,77,0.08);
+  border: 1px solid #ff4d4d;
+  border-radius: var(--ecm-radius-md);
+  padding: 14px 20px;
+  margin: 0 0 24px;
+  color: #ffd5d5;
+  font-size: 14.5px;
+  text-align: center;
+}
+.ecm-activate-banner a { color: var(--ecm-green); font-weight: 700; }
 
 /* ── صفحة تفعيل الجهاز ── */
 .ecm-activate { max-width: 680px; margin: 0 auto; }
