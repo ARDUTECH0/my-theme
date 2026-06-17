@@ -4,7 +4,7 @@ Theme URI:   https://ecameraman.com
 Author:      E.Camera.Man
 Author URI:  https://ecameraman.com
 Description: ثيم احترافي لموقع ECM — E.Camera.Man مع دعم Elementor كامل
-Version:     3.0.25
+Version:     3.0.26
 License:     GNU General Public License v2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Text Domain: ecm-theme
@@ -4789,6 +4789,83 @@ body.admin-bar #ecm-header {
 .ecm-avatar-hint { color: var(--ecm-grey-mid); font-size: 12px; margin: 0; }
 .ecm-avatar-remove { color: var(--ecm-grey-mid); font-size: 13px; display: flex; align-items: center; gap: 6px; }
 
+/* ════════════════════════════════════════════════════════════
+   صفحة الحساب — تخطيط احترافي (رأس بروفايل فوق + قائمة جنب)
+   ════════════════════════════════════════════════════════════ */
+.woocommerce-account.logged-in .woocommerce {
+  display: grid;
+  grid-template-columns: 250px 1fr;
+  gap: 26px;
+  align-items: start;
+}
+.woocommerce-account.logged-in .woocommerce > .woocommerce-notices-wrapper { grid-column: 1 / -1; }
+.ecm-profile-head { grid-column: 1 / -1; }
+.woocommerce-account.logged-in .woocommerce-MyAccount-navigation {
+  grid-column: 1; width: auto !important; float: none !important;
+}
+.woocommerce-account.logged-in .woocommerce-MyAccount-content {
+  grid-column: 2; width: auto !important; float: none !important; margin: 0 !important;
+}
+
+/* رأس البروفايل */
+.ecm-profile-head {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  background:
+    radial-gradient(circle at 12% 30%, var(--ecm-green-subtle), transparent 60%),
+    linear-gradient(150deg, var(--ecm-bg-card), #14161a);
+  border: 1px solid var(--ecm-border);
+  border-radius: var(--ecm-radius-md);
+  padding: 26px 30px;
+}
+.ecm-profile-avatar {
+  width: 96px; height: 96px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid var(--ecm-green);
+  box-shadow: 0 0 22px var(--ecm-green-glow);
+}
+.ecm-profile-name {
+  font-family: 'Orbitron','Cairo',sans-serif;
+  color: var(--ecm-white); font-weight: 800; font-size: 22px; margin: 0 0 4px;
+}
+.ecm-profile-email { color: var(--ecm-grey-mid); font-size: 14px; margin: 0 0 14px; }
+.ecm-profile-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.ecm-profile-actions a {
+  font-size: 13px; font-weight: 600;
+  padding: 8px 16px;
+  border: 1px solid var(--ecm-border);
+  border-radius: 22px;
+  color: var(--ecm-grey-light);
+  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+.ecm-profile-actions a:hover { border-color: var(--ecm-green); color: var(--ecm-green); background: var(--ecm-green-subtle); }
+.ecm-profile-actions .ecm-profile-logout:hover { border-color: #ff4d4d; color: #ff4d4d; background: rgba(255,77,77,0.08); }
+
+/* قائمة الحساب كاختيارات احترافية بأيقونات */
+.woocommerce-account .woocommerce-MyAccount-navigation ul { margin: 0; padding: 0; list-style: none; }
+.woocommerce-account .woocommerce-MyAccount-navigation li a {
+  display: flex; align-items: center; gap: 10px;
+}
+.woocommerce-MyAccount-navigation-link a::before {
+  font-size: 15px; line-height: 1;
+}
+.woocommerce-MyAccount-navigation-link--dashboard a::before { content: '🏠'; }
+.woocommerce-MyAccount-navigation-link--orders a::before { content: '🧾'; }
+.woocommerce-MyAccount-navigation-link--downloads a::before { content: '⬇'; }
+.woocommerce-MyAccount-navigation-link--edit-address a::before { content: '📍'; }
+.woocommerce-MyAccount-navigation-link--edit-account a::before { content: '⚙'; }
+.woocommerce-MyAccount-navigation-link--customer-logout a::before { content: '↩'; }
+
+@media (max-width: 760px) {
+  .woocommerce-account.logged-in .woocommerce { grid-template-columns: 1fr; }
+  .woocommerce-account.logged-in .woocommerce-MyAccount-navigation,
+  .woocommerce-account.logged-in .woocommerce-MyAccount-content { grid-column: 1; }
+  .ecm-profile-head { flex-direction: column; text-align: center; }
+  .ecm-profile-actions { justify-content: center; }
+}
+
 /* ── ترقيم الصفحات ── */
 .woocommerce nav.woocommerce-pagination ul { border: none; gap: 6px; display: flex; justify-content: center; }
 .woocommerce nav.woocommerce-pagination ul li {
@@ -4897,6 +4974,29 @@ body.admin-bar #ecm-header {
   line-height: 1.2;
   margin-bottom: 14px;
 }
+/* إشعار "أنت مشتري المنتج ده بالفعل" */
+.ecm-bought-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: var(--ecm-green-subtle);
+  border: 1px solid var(--ecm-green);
+  border-radius: var(--ecm-radius-md);
+  padding: 16px 18px;
+  margin: 18px 0;
+}
+.ecm-bought-ic { font-size: 20px; line-height: 1.2; }
+.ecm-bought-text { display: flex; flex-direction: column; gap: 3px; }
+.ecm-bought-text strong { color: var(--ecm-white); font-size: 15px; }
+.ecm-bought-text span { color: var(--ecm-grey-mid); font-size: 13px; }
+.ecm-bought-link {
+  align-self: flex-start;
+  margin-top: 8px;
+  font-weight: 700;
+  color: var(--ecm-green);
+}
+.ecm-bought-link:hover { text-decoration: underline; }
+
 /* شارة رقمي فوق العنوان (تظهر بـ PHP للمنتجات الرقمية فقط) */
 .ecm-single-digital {
   display: inline-block;

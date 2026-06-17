@@ -141,6 +141,31 @@ add_action( 'woocommerce_before_shop_loop_item_title', function () {
     }
 }, 9 );
 
+// ── إشعار "أنت مشتري المنتج ده بالفعل" في صفحة المنتج ──────────
+add_action( 'woocommerce_single_product_summary', function () {
+    if ( ! is_user_logged_in() || ! function_exists( 'wc_customer_bought_product' ) ) {
+        return;
+    }
+    global $product;
+    if ( ! $product ) {
+        return;
+    }
+    $user = wp_get_current_user();
+    if ( ! wc_customer_bought_product( $user->user_email, $user->ID, $product->get_id() ) ) {
+        return;
+    }
+
+    echo '<div class="ecm-bought-notice">';
+    echo '<span class="ecm-bought-ic">✅</span>';
+    echo '<div class="ecm-bought-text">';
+    echo '<strong>' . esc_html__( 'أنت مشترٍ المنتج ده بالفعل', 'ecm-theme' ) . '</strong>';
+    echo '<span>' . esc_html__( 'تقدر ترجع له وتحمّله أي وقت من حسابك.', 'ecm-theme' ) . '</span>';
+    if ( $product->is_downloadable() ) {
+        echo '<a href="' . esc_url( wc_get_account_endpoint_url( 'downloads' ) ) . '" class="ecm-bought-link">⬇ ' . esc_html__( 'روح لتحميلاتي', 'ecm-theme' ) . '</a>';
+    }
+    echo '</div></div>';
+}, 25 );
+
 // ── شارة "منتج رقمي" فوق عنوان المنتج (للمنتجات القابلة للتحميل) ─
 add_action( 'woocommerce_single_product_summary', function () {
     global $product;

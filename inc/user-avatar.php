@@ -68,6 +68,32 @@ add_filter( 'get_avatar_data', function ( $args, $id_or_email ) {
     return $args;
 }, 10, 2 );
 
+// ── رأس بروفايل احترافي فوق صفحة الحساب (صورة + اسم + اختيارات) ─
+function ecm_account_profile_header() {
+    $u = wp_get_current_user();
+    if ( ! $u || ! $u->ID ) {
+        return;
+    }
+    $avatar = get_avatar( $u->ID, 120, '', $u->display_name, [ 'class' => 'ecm-profile-avatar' ] );
+    ?>
+    <div class="ecm-profile-head">
+        <div class="ecm-profile-avatar-wrap"><?php echo $avatar; ?></div>
+        <div class="ecm-profile-meta">
+            <h2 class="ecm-profile-name"><?php echo esc_html( $u->display_name ); ?></h2>
+            <p class="ecm-profile-email"><?php echo esc_html( $u->user_email ); ?></p>
+            <div class="ecm-profile-actions">
+                <a href="<?php echo esc_url( wc_get_account_endpoint_url( 'orders' ) ); ?>">🧾 <?php esc_html_e( 'طلباتي', 'ecm-theme' ); ?></a>
+                <a href="<?php echo esc_url( wc_get_account_endpoint_url( 'downloads' ) ); ?>">⬇ <?php esc_html_e( 'تحميلاتي', 'ecm-theme' ); ?></a>
+                <a href="<?php echo esc_url( wc_get_account_endpoint_url( 'edit-account' ) ); ?>">⚙ <?php esc_html_e( 'تعديل الحساب', 'ecm-theme' ); ?></a>
+                <a href="<?php echo esc_url( wp_logout_url( home_url( '/' ) ) ); ?>" class="ecm-profile-logout">↩ <?php esc_html_e( 'خروج', 'ecm-theme' ); ?></a>
+            </div>
+        </div>
+    </div>
+    <?php
+}
+// أولوية 5 عشان يطلع قبل قائمة التنقّل (كعنصر مباشر في .woocommerce)
+add_action( 'woocommerce_account_navigation', 'ecm_account_profile_header', 5 );
+
 // ── حقل رفع الصورة في صفحة الحساب (بيانات الحساب) ─────────────
 add_action( 'woocommerce_edit_account_form_tag', function () {
     echo 'enctype="multipart/form-data"';
