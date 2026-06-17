@@ -188,6 +188,15 @@ class ECM_Widget_Slider_3D extends \Elementor\Widget_Base {
             ],
         ] );
 
+        $this->add_control( 'text_box', [
+            'label'        => __( 'خلفية صندوق النص', 'ecm-theme' ),
+            'type'         => \Elementor\Controls_Manager::SWITCHER,
+            'return_value' => 'yes',
+            'default'      => 'yes',
+            'description'  => __( 'قفلها عشان الصندوق يبقى شفاف تمامًا (النص فوق الموديل مباشرة).', 'ecm-theme' ),
+            'condition'    => [ 'media_side' => 'bg' ],
+        ] );
+
         $this->end_controls_section();
     }
 
@@ -201,8 +210,10 @@ class ECM_Widget_Slider_3D extends \Elementor\Widget_Base {
         $autoplay = ( 'yes' === $s['autoplay'] ) ? max( 2, (int) ( $s['autoplay_delay'] ?? 6 ) ) * 1000 : 0;
         $bg_mode  = ( 'bg' === ( $s['media_side'] ?? 'start' ) );
         $full     = ( 'yes' === ( $s['full_width'] ?? '' ) );
+        $no_box   = $bg_mode && 'yes' !== ( $s['text_box'] ?? 'yes' );
         $wrap_cls = 'ecm-slider-3d'
             . ( $bg_mode ? ' ecm-slider-3d--bg' : '' )
+            . ( $no_box ? ' ecm-slider-3d--no-box' : '' )
             . ( $full ? ' ecm-slider-3d--full' : '' );
 
         echo '<div class="' . esc_attr( $wrap_cls ) . '" data-autoplay="' . esc_attr( $autoplay ) . '">';
