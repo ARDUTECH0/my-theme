@@ -74,21 +74,82 @@ function ecm_shop_category_nav() {
 // ── لوحة احترافية في رئيسية الحساب ────────────────────────────
 add_action( 'woocommerce_account_dashboard', 'ecm_account_dashboard_cards', 5 );
 function ecm_account_dashboard_cards() {
-    $u      = wp_get_current_user();
-    $avatar = get_avatar( $u->ID, 64, '', $u->display_name, [ 'class' => 'ecm-dash-avatar' ] );
-    $links  = [
+    $u = wp_get_current_user();
+
+    // بيانات
+    $orders_count = function_exists( 'wc_get_customer_order_count' ) ? (int) wc_get_customer_order_count( $u->ID ) : 0;
+    $downloads    = function_exists( 'wc_get_customer_available_downloads' ) ? (array) wc_get_customer_available_downloads( $u->ID ) : [];
+    $devices      = function_exists( 'ecm_user_devices' ) ? ecm_user_devices( $u->ID ) : [];
+    $avatar       = get_avatar( $u->ID, 64, '', $u->display_name, [ 'class' => 'ecm-dash-avatar' ] );
+
+    echo '<div class="ecm-dash">';
+
+    // الرأس
+    echo '<div class="ecm-dash-head">' . $avatar . '<div class="ecm-dash-meta"><h3>' . esc_html__( 'أهلاً', 'ecm-theme' ) . ' ' . esc_html( $u->display_name ) . ' 👋</h3><span>' . esc_html( $u->user_email ) . '</span></div></div>';
+
+    // إحصائيات
+    echo '<div class="ecm-dash-stats">';
+    echo '<div class="ecm-dash-stat"><span class="n">' . $orders_count . '</span><span class="l">' . esc_html__( 'طلب', 'ecm-theme' ) . '</span></div>';
+    echo '<div class="ecm-dash-stat"><span class="n">' . count( $devices ) . '</span><span class="l">' . esc_html__( 'جهاز مفعّل', 'ecm-theme' ) . '</span></div>';
+    echo '<div class="ecm-dash-stat"><span class="n">' . count( $downloads ) . '</span><span class="l">' . esc_html__( 'منتج رقمي', 'ecm-theme' ) . '</span></div>';
+    echo '</div>';
+
+    // اختصارات
+    $links = [
         [ 'orders', '🧾', __( 'الطلبات', 'ecm-theme' ) ],
         [ 'downloads', '⬇', __( 'التحميلات', 'ecm-theme' ) ],
         [ 'my-devices', '🛡️', __( 'أجهزتي', 'ecm-theme' ) ],
         [ 'edit-account', '⚙', __( 'بيانات الحساب', 'ecm-theme' ) ],
     ];
-    echo '<div class="ecm-dash">';
-    echo '<div class="ecm-dash-head">' . $avatar . '<div class="ecm-dash-meta"><h3>' . esc_html( $u->display_name ) . '</h3><span>' . esc_html( $u->user_email ) . '</span></div></div>';
     echo '<div class="ecm-dash-grid">';
     foreach ( $links as $l ) {
         echo '<a class="ecm-dash-card" href="' . esc_url( wc_get_account_endpoint_url( $l[0] ) ) . '"><span class="ic">' . $l[1] . '</span><span class="t">' . esc_html( $l[2] ) . '</span></a>';
     }
-    echo '</div></div>';
+    echo '</div>';
+
+    // ── منتجاتك الرقمية ──
+    echo '<h3 class="ecm-dash-section">📦 ' . esc_html__( 'منتجاتك الرقمية', 'ecm-theme' ) . '</h3>';
+    if ( $downloads ) {
+        $seen = [];
+        echo '<div class="ecm-dash-list">';
+        foreach ( $downloads as $d ) {
+            $pid = $d['product_id'] ?? 0;
+            if ( $pid && isset( $seen[ $pid ] ) ) {
+                continue;
+            }
+            $seen[ $pid ] = 1;
+            echo '<div class="ecm-dash-item">';
+            echo '<span class="ecm-dash-item-name">🎬 ' . esc_html( $d['product_name'] ?? '' ) . '</span>';
+            echo '<a class="ecm-dash-item-btn" href="' . esc_url( $d['download_url'] ?? '#' ) . '">⬇ ' . esc_html__( 'تحميل', 'ecm-theme' ) . '</a>';
+            echo '</div>';
+        }
+        echo '</div>';
+    } else {
+        echo '<p class="ecm-dash-empty">' . esc_html__( 'لسه مشتريتش منتجات.', 'ecm-theme' ) . ' <a href="' . esc_url( wc_get_page_permalink( 'shop' ) ) . '">' . esc_html__( 'روح للمتجر ←', 'ecm-theme' ) . '</a></p>';
+    }
+
+    // ── أجهزتك ──
+    echo '<h3 class="ecm-dash-section">🛡️ ' . esc_html__( 'أجهزتك المفعّلة', 'ecm-theme' ) . '</h3>';
+    if ( $devices ) {
+        echo '<div class="ecm-dash-list">';
+        foreach ( $devices as $r ) {
+            $warr_m   = (int) ( $r->warranty_months ?? 12 );
+            $act_ts   = $r->activated_at ? strtotime( $r->activated_at ) : time();
+            $warr_end = strtotime( '+' . $warr_m . ' months', $act_ts );
+            $valid    = ( current_time( 'timestamp' ) < $warr_end );
+            echo '<div class="ecm-dash-item">';
+            echo '<span class="ecm-dash-item-name">🔒 ' . esc_html( $r->serial ) . '</span>';
+            echo '<span class="ecm-dash-badge ' . ( $valid ? 'ok' : 'end' ) . '">' . ( $valid ? esc_html__( 'ضمان ساري', 'ecm-theme' ) : esc_html__( 'ضمان منتهي', 'ecm-theme' ) ) . '</span>';
+            echo '</div>';
+        }
+        echo '</div>';
+        echo '<p class="ecm-dash-more"><a href="' . esc_url( wc_get_account_endpoint_url( 'my-devices' ) ) . '">' . esc_html__( 'تفاصيل كل الأجهزة ←', 'ecm-theme' ) . '</a></p>';
+    } else {
+        $act_url = function_exists( 'ecm_activation_page_url' ) ? ecm_activation_page_url() : '#';
+        echo '<p class="ecm-dash-empty">' . esc_html__( 'لسه مفعّلتش أي جهاز.', 'ecm-theme' ) . ' <a href="' . esc_url( $act_url ) . '">' . esc_html__( 'فعّل جهازك ←', 'ecm-theme' ) . '</a></p>';
+    }
+
+    echo '</div>';
 }
 
 // ── دخول/خروج · حساب · سلة في القائمة الرئيسية ────────────────

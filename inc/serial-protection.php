@@ -93,6 +93,15 @@ function ecm_user_has_active_device( int $user_id ): bool {
     return (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . ecm_serial_table() . ' WHERE user_id = %d', $user_id ) ) > 0;
 }
 
+/** كل أجهزة المستخدم المفعّلة (صفوف) */
+function ecm_user_devices( int $user_id ): array {
+    if ( ! $user_id ) {
+        return [];
+    }
+    global $wpdb;
+    return (array) $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM ' . ecm_serial_table() . ' WHERE user_id = %d ORDER BY activated_at DESC', $user_id ) );
+}
+
 /** أحدث سيريال مفعّل للمستخدم (أو '') */
 function ecm_user_primary_serial( int $user_id ): string {
     if ( ! $user_id ) {

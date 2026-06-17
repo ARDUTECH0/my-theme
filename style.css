@@ -4,7 +4,7 @@ Theme URI:   https://ecameraman.com
 Author:      E.Camera.Man
 Author URI:  https://ecameraman.com
 Description: ثيم احترافي لموقع ECM — E.Camera.Man مع دعم Elementor كامل
-Version:     3.0.36
+Version:     3.0.37
 License:     GNU General Public License v2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Text Domain: ecm-theme
@@ -4712,6 +4712,42 @@ body.admin-bar #ecm-header {
 .ecm-dash-card .ic { font-size: 26px; }
 .ecm-dash-card .t { font-size: 13.5px; font-weight: 600; }
 .ecm-dash-card:hover { transform: translateY(-3px); border-color: var(--ecm-green); color: var(--ecm-white); }
+
+/* إحصائيات الحساب */
+.ecm-dash-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 22px; }
+.ecm-dash-stat {
+  background: #0f1115; border: 1px solid var(--ecm-border); border-radius: var(--ecm-radius-md);
+  padding: 18px 12px; text-align: center;
+}
+.ecm-dash-stat .n { display: block; font-family: 'Orbitron','Cairo',sans-serif; font-size: 28px; font-weight: 800; color: var(--ecm-green); line-height: 1; }
+.ecm-dash-stat .l { display: block; color: var(--ecm-grey-mid); font-size: 12.5px; margin-top: 6px; }
+
+/* عناوين الأقسام */
+.ecm-dash-section {
+  font-family: 'Orbitron','Cairo',sans-serif; color: var(--ecm-white);
+  font-size: 16px; margin: 26px 0 14px; padding-bottom: 10px;
+  border-bottom: 1px solid var(--ecm-border);
+}
+
+/* قوائم المنتجات/الأجهزة */
+.ecm-dash-list { display: flex; flex-direction: column; gap: 10px; }
+.ecm-dash-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  background: #0f1115; border: 1px solid var(--ecm-border);
+  border-radius: var(--ecm-radius-sm); padding: 13px 16px;
+}
+.ecm-dash-item-name { color: var(--ecm-white); font-weight: 600; font-size: 14px; }
+.ecm-dash-item-btn {
+  background: var(--ecm-green); color: #0d0e11; font-weight: 700; font-size: 13px;
+  padding: 7px 16px; border-radius: 20px; white-space: nowrap;
+}
+.ecm-dash-item-btn:hover { opacity: .9; color: #0d0e11; }
+.ecm-dash-badge { font-size: 12px; font-weight: 700; padding: 5px 12px; border-radius: 20px; white-space: nowrap; }
+.ecm-dash-badge.ok { background: var(--ecm-green-subtle); color: var(--ecm-green); border: 1px solid var(--ecm-green); }
+.ecm-dash-badge.end { background: rgba(255,77,77,0.1); color: #ff7a7a; border: 1px solid #ff4d4d; }
+.ecm-dash-empty { color: var(--ecm-grey-mid); font-size: 14px; }
+.ecm-dash-empty a, .ecm-dash-more a { color: var(--ecm-green); font-weight: 700; }
+.ecm-dash-more { margin: 12px 0 0; }
 
 /* ── السلة والدفع: الجداول ── */
 .woocommerce table.shop_table {
