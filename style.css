@@ -4,7 +4,7 @@ Theme URI:   https://ecameraman.com
 Author:      E.Camera.Man
 Author URI:  https://ecameraman.com
 Description: ثيم احترافي لموقع ECM — E.Camera.Man مع دعم Elementor كامل
-Version:     3.0.38
+Version:     3.0.39
 License:     GNU General Public License v2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Text Domain: ecm-theme
@@ -4426,6 +4426,29 @@ body.admin-bar #ecm-header {
   max-width: 1200px;
   margin: 0 auto;
 }
+
+/* ── شريط بحث المنتجات ── */
+.ecm-shop-search {
+  display: flex; align-items: center; gap: 4px;
+  background: var(--ecm-bg-card); border: 1px solid var(--ecm-border);
+  border-radius: 30px; padding: 4px 4px 4px 16px;
+  margin: 0 0 18px; max-width: 540px;
+  transition: border-color .2s ease, box-shadow .2s ease;
+}
+.ecm-shop-search:focus-within { border-color: var(--ecm-green); box-shadow: 0 0 0 3px var(--ecm-green-subtle); }
+.ecm-shop-search-ic { color: var(--ecm-grey-mid); font-size: 16px; }
+.ecm-shop-search input[type="search"] {
+  flex: 1; background: transparent; border: none; outline: none;
+  color: var(--ecm-white); padding: 12px; font-size: 14.5px;
+}
+.ecm-shop-search input[type="search"]::placeholder { color: var(--ecm-grey-mid); }
+.ecm-shop-search button {
+  background: var(--ecm-green); color: #0d0e11; border: none;
+  border-radius: 24px; padding: 11px 26px; font-weight: 700; cursor: pointer;
+  font-family: 'Orbitron','Cairo',sans-serif; letter-spacing: 0.5px;
+  transition: opacity .2s ease, transform .15s ease;
+}
+.ecm-shop-search button:hover { opacity: .92; transform: translateY(-1px); }
 
 /* ── شريط تصنيفات المتجر ── */
 .ecm-shop-cats {

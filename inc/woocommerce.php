@@ -49,6 +49,21 @@ add_action( 'woocommerce_after_main_content', function () {
 add_filter( 'loop_shop_columns', function () { return 3; }, 20 );
 add_filter( 'loop_shop_per_page', function () { return 12; }, 20 );
 
+// ── شريط بحث المنتجات فوق المتجر ──────────────────────────────
+add_action( 'woocommerce_before_shop_loop', 'ecm_shop_search_bar', 4 );
+function ecm_shop_search_bar() {
+    if ( ! ( is_shop() || is_product_category() || ( is_search() && 'product' === get_query_var( 'post_type' ) ) ) ) {
+        return;
+    }
+    $q = get_search_query();
+    echo '<form role="search" method="get" class="ecm-shop-search" action="' . esc_url( home_url( '/' ) ) . '">';
+    echo '<span class="ecm-shop-search-ic" aria-hidden="true">🔍</span>';
+    echo '<input type="search" name="s" value="' . esc_attr( $q ) . '" placeholder="' . esc_attr__( 'ابحث عن منتج…', 'ecm-theme' ) . '" aria-label="' . esc_attr__( 'بحث عن منتج', 'ecm-theme' ) . '">';
+    echo '<input type="hidden" name="post_type" value="product">';
+    echo '<button type="submit">' . esc_html__( 'بحث', 'ecm-theme' ) . '</button>';
+    echo '</form>';
+}
+
 // ── شريط التصنيفات فوق المتجر (احترافي) ───────────────────────
 add_action( 'woocommerce_before_shop_loop', 'ecm_shop_category_nav', 5 );
 function ecm_shop_category_nav() {
