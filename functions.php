@@ -376,7 +376,7 @@ add_action( 'wp_enqueue_scripts', 'ecm_enqueue_assets' );
 
 
 // ── THEME VERSION CONSTANT ───────────────────────────────────
-define( 'ECM_VERSION', '3.0.15' );
+define( 'ECM_VERSION', '3.0.16' );
 
 
 // ── INCLUDE: FRONT PAGE CUSTOMIZER ──────────────────────────
@@ -419,6 +419,9 @@ require_once get_template_directory() . '/inc/seo.php';
 // ── INCLUDE: قوالب صفحات جاهزة في Elementor ──────────────────
 // (بعد elementor-seed عشان يستخدم نفس الـ helpers)
 require_once get_template_directory() . '/inc/elementor-starter-templates.php';
+
+// ── INCLUDE: تكرار الصفحات (Duplicate) ───────────────────────
+require_once get_template_directory() . '/inc/duplicate-page.php';
 
 
 // ── ELEMENTOR PRO — THEME BUILDER LOCATIONS ──────────────────
