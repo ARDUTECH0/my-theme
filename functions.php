@@ -376,7 +376,7 @@ add_action( 'wp_enqueue_scripts', 'ecm_enqueue_assets' );
 
 
 // ── THEME VERSION CONSTANT ───────────────────────────────────
-define( 'ECM_VERSION', '3.0.29' );
+define( 'ECM_VERSION', '3.0.30' );
 
 
 // ── INCLUDE: FRONT PAGE CUSTOMIZER ──────────────────────────
@@ -437,6 +437,9 @@ require_once get_template_directory() . '/inc/invoice.php';
 
 // ── INCLUDE: QR Code لروابط التحميل ──────────────────────────
 require_once get_template_directory() . '/inc/download-qr.php';
+
+// ── INCLUDE: حماية الأجهزة بالسيريال + ربط بالإيميل ──────────
+require_once get_template_directory() . '/inc/serial-protection.php';
 
 
 // ── ELEMENTOR PRO — THEME BUILDER LOCATIONS ──────────────────
