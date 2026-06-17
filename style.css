@@ -4,7 +4,7 @@ Theme URI:   https://ecameraman.com
 Author:      E.Camera.Man
 Author URI:  https://ecameraman.com
 Description: ثيم احترافي لموقع ECM — E.Camera.Man مع دعم Elementor كامل
-Version:     3.0.37
+Version:     3.0.38
 License:     GNU General Public License v2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Text Domain: ecm-theme
@@ -5758,5 +5758,57 @@ body.admin-bar #ecm-header {
 .woocommerce div.product .woocommerce-tabs .panel table td,
 .woocommerce div.product .woocommerce-tabs .panel table th {
   border-color: var(--ecm-border); color: var(--ecm-grey-light); padding: 10px 14px;
+}
+
+
+/* ════════════════════════════════════════════════════════════
+   صفحة المنتج — لمسات Premium (Trust + تلميع)
+   ════════════════════════════════════════════════════════════ */
+/* خط أخضر علوي على كارت الملخّص */
+.woocommerce div.product .summary.entry-summary { position: sticky; top: 100px; overflow: hidden; }
+.woocommerce div.product .summary.entry-summary::before {
+  content: '';
+  position: absolute; inset: 0 0 auto 0; height: 3px;
+  background: linear-gradient(90deg, transparent, var(--ecm-green), transparent);
+}
+
+/* زر الشراء — لمعة عند المرور */
+.woocommerce div.product form.cart .single_add_to_cart_button {
+  position: relative; overflow: hidden;
+  box-shadow: 0 8px 24px rgba(156,255,0,0.18);
+}
+.woocommerce div.product form.cart .single_add_to_cart_button::after {
+  content: ''; position: absolute; top: 0; inset-inline-start: -120%;
+  width: 60%; height: 100%;
+  background: linear-gradient(120deg, transparent, rgba(255,255,255,0.45), transparent);
+  transform: skewX(-20deg); transition: inset-inline-start .6s ease;
+}
+.woocommerce div.product form.cart .single_add_to_cart_button:hover::after { inset-inline-start: 140%; }
+.woocommerce div.product form.cart .single_add_to_cart_button:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(156,255,0,0.32); }
+
+/* صفّ الثقة */
+.ecm-trust {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  margin: 22px 0 6px; padding-top: 22px;
+  border-top: 1px solid var(--ecm-border);
+}
+.ecm-trust-item {
+  display: flex; align-items: center; gap: 11px;
+  background: #0f1115; border: 1px solid var(--ecm-border);
+  border-radius: var(--ecm-radius-sm); padding: 12px 14px;
+  transition: border-color .2s ease, transform .15s ease;
+}
+.ecm-trust-item:hover { border-color: var(--ecm-green); transform: translateY(-2px); }
+.ecm-trust-ic { font-size: 22px; line-height: 1; }
+.ecm-trust-txt { display: flex; flex-direction: column; }
+.ecm-trust-txt strong { color: var(--ecm-white); font-size: 13.5px; }
+.ecm-trust-txt small { color: var(--ecm-grey-mid); font-size: 11.5px; }
+
+/* العنوان الفرعي / السعر — تلميع */
+.woocommerce div.product .summary p.price ins,
+.woocommerce div.product .summary p.price { text-shadow: 0 0 24px var(--ecm-green-glow); }
+
+@media (max-width: 480px) {
+  .ecm-trust { grid-template-columns: 1fr; }
 }
 

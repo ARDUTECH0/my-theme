@@ -290,6 +290,21 @@ add_action( 'woocommerce_single_product_summary', function () {
     }
 }, 4 );
 
+// ── صفّ الثقة (Trust badges) تحت زر الشراء ───────────────────
+add_action( 'woocommerce_single_product_summary', function () {
+    $items = [
+        [ '🔒', __( 'دفع آمن', 'ecm-theme' ), __( 'معاملات مشفّرة 100%', 'ecm-theme' ) ],
+        [ '⚡', __( 'تحميل فوري', 'ecm-theme' ), __( 'بعد الدفع مباشرة', 'ecm-theme' ) ],
+        [ '🛡️', __( 'منتج أصلي', 'ecm-theme' ), __( 'مضمون ومُفعّل', 'ecm-theme' ) ],
+        [ '💬', __( 'دعم فني', 'ecm-theme' ), __( 'على مدار الأسبوع', 'ecm-theme' ) ],
+    ];
+    echo '<div class="ecm-trust">';
+    foreach ( $items as $it ) {
+        echo '<div class="ecm-trust-item"><span class="ecm-trust-ic">' . $it[0] . '</span><div class="ecm-trust-txt"><strong>' . esc_html( $it[1] ) . '</strong><small>' . esc_html( $it[2] ) . '</small></div></div>';
+    }
+    echo '</div>';
+}, 35 );
+
 // ── نص زر "أضف للسلة" أوضح للمنتجات الرقمية ───────────────────
 add_filter( 'woocommerce_product_single_add_to_cart_text', function ( $text, $product ) {
     if ( $product && $product->is_downloadable() ) {
