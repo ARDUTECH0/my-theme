@@ -247,6 +247,263 @@ function ecm_starter_3d_showcase(): array {
 
 
 // ════════════════════════════════════════════════════════════
+// §2.5  قالب: شرح لوحة التحكم (Control Panel) — سلايدر 3D + شرح أزرار
+// ════════════════════════════════════════════════════════════
+
+/** صفّ repeater مع _id فريد (مطلوب لعناصر الـ repeater في Elementor) */
+function ecm_starter_rep_row( array $row ): array {
+    $row['_id'] = ecm_el_id();
+    return $row;
+}
+
+/** سلايدر 3D للقالب — 3 شرائح تشرح فكرة التحكم */
+function ecm_starter_control_slider(): array {
+    $slides = [
+        ecm_starter_rep_row( [
+            'glb_url'  => '',
+            'eyebrow'  => 'CRANE',
+            'title'    => 'تحكم احترافي بحركة الكاميرا',
+            'subtitle' => 'حُط ملف الكاميرا (.glb) هنا — اسحب باللف، عجلة الماوس للزوم.',
+            'btn_text' => '',
+            'btn_link' => [ 'url' => '', 'is_external' => '', 'nofollow' => '' ],
+        ] ),
+        ecm_starter_rep_row( [
+            'glb_url'  => '',
+            'eyebrow'  => 'SPEED · ACC',
+            'title'    => 'سرعة وتسارع تحت أمرك',
+            'subtitle' => 'اضبط سرعة الحركة (Speed) ونعومتها (Acceleration) بدقّة من التطبيق.',
+            'btn_text' => '',
+            'btn_link' => [ 'url' => '', 'is_external' => '', 'nofollow' => '' ],
+        ] ),
+        ecm_starter_rep_row( [
+            'glb_url'  => '',
+            'eyebrow'  => 'POSITION',
+            'title'    => 'الموقع الحالي والهدف',
+            'subtitle' => 'تابع الموقع الحالي لحظيًا، وحدّد الموقع الهدف بضغطة زر.',
+            'btn_text' => '',
+            'btn_link' => [ 'url' => '', 'is_external' => '', 'nofollow' => '' ],
+        ] ),
+    ];
+
+    return ecm_el_widget( 'ecm_slider_3d', [
+        'slides'         => $slides,
+        'height'         => [ 'size' => 480, 'unit' => 'px' ],
+        'autoplay'       => 'yes',
+        'autoplay_delay' => 6,
+        'arrows'         => 'yes',
+        'dots'           => 'yes',
+        'full_width'     => '',
+        'auto_rotate'    => '',
+        'play_animation' => 'yes',
+        'zoom'           => 'yes',
+        'zoom_buttons'   => '',
+        'model_size'     => [ 'size' => 90, 'unit' => 'px' ],
+        'media_side'     => 'start',
+        'text_box'       => 'yes',
+    ] );
+}
+
+/** شبكة شرح أزرار لوحة التحكم */
+function ecm_starter_control_gridw(): array {
+    $cells = [
+        ecm_starter_rep_row( [
+            'media_type' => '3d', 'glb_url' => '', 'arrow' => 'up-down',
+            'title' => 'السرعة (Speed)',
+            'desc'  => 'بتحدد سرعة حركة الكاميرا. زوّدها أو قلّلها بأزرار + و −. القيمة بتظهر فوق مباشرة (مثال: 45).',
+            'btn_text' => '', 'btn_link' => [ 'url' => '' ],
+        ] ),
+        ecm_starter_rep_row( [
+            'media_type' => '3d', 'glb_url' => '', 'arrow' => 'right',
+            'title' => 'التسارع (Acc)',
+            'desc'  => 'قيمة التسارع — بتتحكم في نعومة بداية ونهاية الحركة. اسحب المؤشّر لضبط الدرجة.',
+            'btn_text' => '', 'btn_link' => [ 'url' => '' ],
+        ] ),
+        ecm_starter_rep_row( [
+            'media_type' => '3d', 'glb_url' => '', 'arrow' => 'down',
+            'title' => 'الموقع الحالي (Current)',
+            'desc'  => 'بيعرض موقع الكاميرا الحالي لحظيًا أثناء الحركة (مثال: 16).',
+            'btn_text' => '', 'btn_link' => [ 'url' => '' ],
+        ] ),
+        ecm_starter_rep_row( [
+            'media_type' => '3d', 'glb_url' => '', 'arrow' => 'up',
+            'title' => 'الموقع الهدف (Target)',
+            'desc'  => 'الموقع اللي الكاميرا هتروح له. حدّده بالرقم وبأزرار + و − (مثال: 903).',
+            'btn_text' => '', 'btn_link' => [ 'url' => '' ],
+        ] ),
+        ecm_starter_rep_row( [
+            'media_type' => '3d', 'glb_url' => '', 'arrow' => 'left-right',
+            'title' => 'أزرار الزيادة والنقصان',
+            'desc'  => 'كل قيمة ليها زرّين: + لزيادتها و − لتقليلها بخطوة محددة — للضبط الدقيق.',
+            'btn_text' => '', 'btn_link' => [ 'url' => '' ],
+        ] ),
+        ecm_starter_rep_row( [
+            'media_type' => '3d', 'glb_url' => '', 'arrow' => 'rotate-cw',
+            'title' => 'تنفيذ الحركة',
+            'desc'  => 'بعد ضبط القيم، التطبيق بيبعت الأمر للموتور فيتحرك للهدف بالسرعة والتسارع المحددين.',
+            'btn_text' => '', 'btn_link' => [ 'url' => '' ],
+        ] ),
+    ];
+
+    return ecm_el_widget( 'ecm_control_grid', [
+        'shared_glb'  => '',
+        'cells'       => $cells,
+        'columns'     => '3',
+        'cell_height' => [ 'size' => 220, 'unit' => 'px' ],
+        'gap'         => [ 'size' => 22, 'unit' => 'px' ],
+        'auto_rotate' => '',
+        'model_fill'  => [ 'size' => 85, 'unit' => 'px' ],
+        'card_style'  => 'card',
+        'arrow_color' => '#ff4d2e',
+    ] );
+}
+
+/** قسم المواصفات الفنية (Technical) */
+function ecm_starter_control_tech(): array {
+    $col = ecm_el_column( 100, [
+        ecm_el_widget( 'ecm_eyebrow', [ 'text' => 'TECHNICAL · مواصفات فنية', 'show_dot' => 'yes', 'html_tag' => 'span' ] ),
+        ecm_el_widget( 'heading', [ 'title' => 'تفاصيل تقنية', 'header_size' => 'h2' ] ),
+        ecm_el_widget( 'ecm_spec_row', [ 'label' => 'بروتوكول الاتصال', 'val' => 'Wi-Fi / ESP-NOW', 'highlight' => '' ] ),
+        ecm_el_widget( 'ecm_spec_row', [ 'label' => 'زمن الاستجابة', 'val' => '< 50 مللي ثانية', 'highlight' => 'yes' ] ),
+        ecm_el_widget( 'ecm_spec_row', [ 'label' => 'نطاق السرعة', 'val' => '0 – 100', 'highlight' => '' ] ),
+        ecm_el_widget( 'ecm_spec_row', [ 'label' => 'دقة الموقع', 'val' => '± 1 خطوة', 'highlight' => '' ] ),
+        ecm_el_widget( 'ecm_spec_row', [ 'label' => 'نوع التحكم', 'val' => 'موقع مطلق (Absolute) + سرعة', 'highlight' => '' ] ),
+    ] );
+    return ecm_el_section( [ $col ], [
+        'padding' => [ 'unit' => 'px', 'top' => '20', 'right' => '20', 'bottom' => '80', 'left' => '20', 'isLinked' => false ],
+    ] );
+}
+
+/** قسم: لوحة CRANE الحيّة + شرحها (2 عمود) */
+function ecm_starter_control_card_section(): array {
+    $card_col = ecm_el_column( 50, [
+        ecm_el_widget( 'ecm_ctrl_card', [
+            'icon'          => '🎥',
+            'title'         => 'CRANE',
+            'speed_label'   => 'Speed',
+            'speed_val'     => 45,
+            'bar_pct'       => [ 'size' => 60, 'unit' => 'px' ],
+            'current_label' => 'Current',
+            'current_val'   => 16,
+            'target_label'  => 'Target',
+            'target_val'    => 903,
+        ] ),
+    ] );
+
+    $text_col = ecm_el_column( 50, [
+        ecm_el_widget( 'ecm_eyebrow', [ 'text' => 'LIVE PANEL · اللوحة الحيّة', 'show_dot' => 'yes', 'html_tag' => 'span' ] ),
+        ecm_el_widget( 'heading', [ 'title' => 'لوحة التحكم بالتفصيل', 'header_size' => 'h2' ] ),
+        ecm_el_widget( 'text-editor', [ 'editor' => '<p>دي نفس اللوحة اللي بتشوفها في التطبيق. كل عنصر فيها ليه وظيفة محددة — من السرعة للتسارع للموقع الهدف. الأرقام بتتحدّث لحظيًا مع حركة الكاميرا.</p>' ] ),
+        ecm_el_widget( 'ecm_spec_row', [ 'label' => 'Speed', 'val' => 'سرعة الحركة (0–100)', 'highlight' => '' ] ),
+        ecm_el_widget( 'ecm_spec_row', [ 'label' => 'Acc', 'val' => 'نعومة التسارع', 'highlight' => '' ] ),
+        ecm_el_widget( 'ecm_spec_row', [ 'label' => 'Current', 'val' => 'الموقع الحالي لحظيًا', 'highlight' => '' ] ),
+        ecm_el_widget( 'ecm_spec_row', [ 'label' => 'Target', 'val' => 'الموقع الهدف', 'highlight' => 'yes' ] ),
+    ], [ 'content_position' => 'center' ] );
+
+    return ecm_el_section(
+        [ $card_col, $text_col ],
+        [
+            'gap'              => 'extended',
+            'structure'        => '20',
+            'content_position' => 'middle',
+            'padding'          => [ 'unit' => 'px', 'top' => '30', 'right' => '20', 'bottom' => '40', 'left' => '20', 'isLinked' => false ],
+        ]
+    );
+}
+
+/** قسم فيديو شرح (عنوان + فيديو) */
+function ecm_starter_video_section( string $eyebrow, string $heading, string $sub ): array {
+    return ecm_el_section(
+        [ ecm_el_column( 100, [
+            ecm_el_widget( 'ecm_eyebrow', [ 'text' => $eyebrow, 'show_dot' => 'yes', 'html_tag' => 'span' ] ),
+            ecm_el_widget( 'heading', [ 'title' => $heading, 'header_size' => 'h2' ] ),
+            ecm_el_widget( 'text-editor', [ 'editor' => '<p style="text-align:center;">' . esc_html( $sub ) . '</p>' ] ),
+            ecm_el_widget( 'video', [
+                'video_type'         => 'youtube',
+                'youtube_url'        => 'https://www.youtube.com/watch?v=XHOmBV4js_E',
+                'aspect_ratio'       => '169',
+                'show_image_overlay' => '',
+                'lightbox'           => 'yes',
+                '_css_classes'       => 'ecm-video-pro',
+            ] ),
+        ] ) ],
+        [ 'content_position' => 'middle', 'padding' => [ 'unit' => 'px', 'top' => '20', 'right' => '20', 'bottom' => '40', 'left' => '20', 'isLinked' => false ] ]
+    );
+}
+
+/** قسم كروت المميزات (3 كروت) */
+function ecm_starter_control_features(): array {
+    $cards = [
+        ecm_el_widget( 'ecm_feat_card', [ 'icon' => '📡', 'title' => 'تحكم لاسلكي', 'text' => 'اتصال Wi-Fi / ESP-NOW سريع ومستقر — تحكّم في الكاميرا من بعيد بدون أسلاك.' ] ),
+        ecm_el_widget( 'ecm_feat_card', [ 'icon' => '🎯', 'title' => 'دقة عالية', 'text' => 'تحديد الموقع الهدف بدقة ± خطوة واحدة، مع تحكم كامل في السرعة والتسارع.' ] ),
+        ecm_el_widget( 'ecm_feat_card', [ 'icon' => '⚡', 'title' => 'استجابة فورية', 'text' => 'زمن استجابة أقل من 50 مللي ثانية — الحركة بتتنفّذ لحظة ما تضغط.' ] ),
+    ];
+    $sections = [ ecm_el_header( 'FEATURES · المميزات', 'ليه نظام التحكم ده؟', 'مصمّم لصنّاع المحتوى المحترفين اللي محتاجين دقة وسلاسة.' ) ];
+    return array_merge( $sections, ecm_el_grid( $cards, 3 ) );
+}
+
+/** قسم خطوات الاستخدام (4 خطوات) */
+function ecm_starter_control_steps(): array {
+    $steps = [
+        ecm_el_widget( 'ecm_feat_card', [ 'icon' => '1', 'title' => 'افتح التطبيق', 'text' => 'شغّل تطبيق ECM وتأكد إن الجهاز متصل بنفس الشبكة.' ] ),
+        ecm_el_widget( 'ecm_feat_card', [ 'icon' => '2', 'title' => 'اضبط السرعة والتسارع', 'text' => 'حدّد قيمة Speed وAcc المناسبة لنوع اللقطة اللي عايزها.' ] ),
+        ecm_el_widget( 'ecm_feat_card', [ 'icon' => '3', 'title' => 'حدّد الموقع الهدف', 'text' => 'اكتب قيمة Target أو استخدم أزرار + و − للوصول للموقع المطلوب.' ] ),
+        ecm_el_widget( 'ecm_feat_card', [ 'icon' => '4', 'title' => 'نفّذ الحركة', 'text' => 'اضغط تنفيذ — الكاميرا هتتحرك للهدف بسلاسة وحسب الإعدادات.' ] ),
+    ];
+    $sections = [ ecm_el_header( 'HOW TO · خطوات الاستخدام', 'استخدمه في 4 خطوات', 'من فتح التطبيق لتنفيذ الحركة — كله بسيط.' ) ];
+    return array_merge( $sections, ecm_el_grid( $steps, 4 ) );
+}
+
+/** قسم CTA نهائي */
+function ecm_starter_control_cta(): array {
+    return ecm_el_section(
+        [ ecm_el_column( 100, [
+            ecm_el_widget( 'heading', [ 'title' => 'جاهز تبدأ التحكم؟', 'header_size' => 'h2' ] ),
+            ecm_el_widget( 'text-editor', [ 'editor' => '<p style="text-align:center;">حمّل التطبيق وابدأ تتحكم في كاميرتك باحترافية.</p>' ] ),
+            ecm_el_button( '⬇️ حمّل التطبيق', '#', 'ecm-btn-primary' ),
+        ] ) ],
+        [ 'content_position' => 'middle', 'padding' => [ 'unit' => 'px', 'top' => '30', 'right' => '20', 'bottom' => '80', 'left' => '20', 'isLinked' => false ] ]
+    );
+}
+
+/** القالب الكامل: شرح لوحة التحكم (احترافي ومفصّل) */
+function ecm_starter_control_panel(): array {
+    $slider_sec = ecm_el_section(
+        [ ecm_el_column( 100, [ ecm_starter_control_slider() ] ) ],
+        [ 'padding' => [ 'unit' => 'px', 'top' => '20', 'right' => '20', 'bottom' => '20', 'left' => '20', 'isLinked' => false ] ]
+    );
+
+    $intro = ecm_el_section(
+        [ ecm_el_column( 100, [
+            ecm_el_widget( 'heading', [ 'title' => 'إزاي تتحكم من التطبيق', 'header_size' => 'h2' ] ),
+            ecm_el_widget( 'text-editor', [ 'editor' => '<p style="text-align:center;">لوحة CRANE بتدّيك تحكم كامل في حركة الكاميرا — السرعة، التسارع، والموقع. تحت كل عنصر شرح مبسّط لوظيفته.</p>' ] ),
+        ] ) ],
+        [ 'content_position' => 'middle', 'padding' => [ 'unit' => 'px', 'top' => '20', 'right' => '20', 'bottom' => '10', 'left' => '20', 'isLinked' => false ] ]
+    );
+
+    $grid_sec = ecm_el_section(
+        [ ecm_el_column( 100, [ ecm_starter_control_gridw() ] ) ],
+        [ 'padding' => [ 'unit' => 'px', 'top' => '10', 'right' => '20', 'bottom' => '40', 'left' => '20', 'isLinked' => false ] ]
+    );
+
+    $sections = [
+        ecm_el_header( 'CONTROL PANEL · لوحة التحكم', 'شرح لوحة تحكم CRANE', 'سلايدر 3D · فيديوهات شرح · تفصيل كل زر ووظيفته في التطبيق.' ),
+        $slider_sec,
+        ecm_starter_control_card_section(),
+        ecm_starter_video_section( 'WALKTHROUGH · شرح بالفيديو', 'جولة كاملة في لوحة التحكم', 'فيديو يشرح كل أزرار اللوحة خطوة بخطوة — غيّر الرابط لفيديوك.' ),
+        $intro,
+        $grid_sec,
+    ];
+    $sections   = array_merge( $sections, ecm_starter_control_features() );
+    $sections   = array_merge( $sections, ecm_starter_control_steps() );
+    $sections[] = ecm_starter_video_section( 'TIPS · نصائح متقدّمة', 'حركات احترافية بالكاميرا', 'أمثلة عملية لحركات سينمائية وإزاي تظبط إعداداتها — استبدله بفيديوك.' );
+    $sections[] = ecm_starter_control_tech();
+    $sections[] = ecm_starter_control_cta();
+
+    return $sections;
+}
+
+
+// ════════════════════════════════════════════════════════════
 // §3  إنشاء القوالب في مكتبة Elementor
 // ════════════════════════════════════════════════════════════
 
@@ -292,9 +549,17 @@ function ecm_create_starter_template( string $title, array $elements ): int {
     return $id;
 }
 
+/** يمسح قالب موجود بالعنوان (عشان النسخة الجديدة تتعمل من جديد) */
+function ecm_delete_library_template( string $title ): void {
+    $id = ecm_find_library_template( $title );
+    if ( $id ) {
+        wp_delete_post( $id, true );
+    }
+}
+
 /** التشغيل التلقائي — مرة واحدة */
 function ecm_seed_starter_templates(): void {
-    if ( get_option( 'ecm_starter_templates_v3' ) ) {
+    if ( get_option( 'ecm_starter_templates_v5' ) ) {
         return;
     }
     if ( ! did_action( 'elementor/loaded' ) ) {
@@ -313,12 +578,16 @@ function ecm_seed_starter_templates(): void {
     ecm_create_starter_template( 'ECM — معرض صور (Gallery)',      ecm_starter_gallery() );
     ecm_create_starter_template( 'ECM — عرض منتج 3D (Showcase)',  ecm_starter_3d_showcase() );
 
-    update_option( 'ecm_starter_templates_v3', true );
+    // قالب لوحة التحكم — نمسح القديم (لو موجود) ونعمل النسخة الاحترافية المفصّلة
+    ecm_delete_library_template( 'ECM — شرح لوحة التحكم (Control Panel)' );
+    ecm_create_starter_template( 'ECM — شرح لوحة التحكم (Control Panel)', ecm_starter_control_panel() );
+
+    update_option( 'ecm_starter_templates_v5', true );
 }
 add_action( 'admin_init', 'ecm_seed_starter_templates', 30 );
 
 /** إعادة الإنشاء عند تفعيل الثيم من جديد */
 function ecm_reset_starter_templates() {
-    delete_option( 'ecm_starter_templates_v3' );
+    delete_option( 'ecm_starter_templates_v5' );
 }
 add_action( 'after_switch_theme', 'ecm_reset_starter_templates' );
