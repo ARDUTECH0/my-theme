@@ -62,9 +62,22 @@ function ecm_woo_menu_items( $items, $args ) {
 
     if ( is_user_logged_in() ) {
         $current = wp_get_current_user();
-        $avatar  = get_avatar( $current->ID, 30, '', $current->display_name, [ 'class' => 'ecm-woo-avatar' ] );
-        $items  .= '<li class="menu-item ecm-woo-menu ecm-woo-account"><a href="' . esc_url( $account_url ) . '" title="' . esc_attr( $current->display_name ) . '">' . $avatar . '<span>' . esc_html__( 'حسابي', 'ecm-theme' ) . '</span></a></li>';
-        $items  .= '<li class="menu-item ecm-woo-menu ecm-woo-logout"><a href="' . esc_url( wp_logout_url( home_url( '/' ) ) ) . '"><span class="ecm-woo-ic">↩</span>' . esc_html__( 'خروج', 'ecm-theme' ) . '</a></li>';
+        $avatar  = get_avatar( $current->ID, 32, '', $current->display_name, [ 'class' => 'ecm-woo-avatar' ] );
+        $fname   = $current->first_name ? $current->first_name : $current->display_name;
+
+        // منيو منسدلة من صورة الحساب (بتستخدم ستايل الدروب‌داون بتاع الثيم)
+        $sub  = '<ul class="sub-menu ecm-account-sub">';
+        $sub .= '<li class="menu-item"><a href="' . esc_url( $account_url ) . '">🏠 ' . esc_html__( 'حسابي', 'ecm-theme' ) . '</a></li>';
+        $sub .= '<li class="menu-item"><a href="' . esc_url( wc_get_account_endpoint_url( 'orders' ) ) . '">🧾 ' . esc_html__( 'طلباتي', 'ecm-theme' ) . '</a></li>';
+        $sub .= '<li class="menu-item"><a href="' . esc_url( wc_get_account_endpoint_url( 'downloads' ) ) . '">⬇ ' . esc_html__( 'تحميلاتي', 'ecm-theme' ) . '</a></li>';
+        $sub .= '<li class="menu-item"><a href="' . esc_url( wc_get_account_endpoint_url( 'edit-account' ) ) . '">⚙ ' . esc_html__( 'تعديل الحساب', 'ecm-theme' ) . '</a></li>';
+        $sub .= '<li class="menu-item ecm-sub-logout"><a href="' . esc_url( wp_logout_url( home_url( '/' ) ) ) . '">↩ ' . esc_html__( 'تسجيل الخروج', 'ecm-theme' ) . '</a></li>';
+        $sub .= '</ul>';
+
+        $items .= '<li class="menu-item menu-item-has-children ecm-woo-menu ecm-woo-account">'
+            . '<a href="' . esc_url( $account_url ) . '" title="' . esc_attr( $current->display_name ) . '">'
+            . $avatar . '<span class="ecm-woo-name">' . esc_html( $fname ) . '</span></a>'
+            . $sub . '</li>';
     } else {
         $items .= '<li class="menu-item ecm-woo-menu ecm-woo-login"><a href="' . esc_url( $account_url ) . '"><span class="ecm-woo-ic">👤</span>' . esc_html__( 'دخول', 'ecm-theme' ) . '</a></li>';
     }

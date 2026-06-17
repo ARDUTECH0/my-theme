@@ -91,8 +91,8 @@ function ecm_account_profile_header() {
     </div>
     <?php
 }
-// أولوية 5 عشان يطلع قبل قائمة التنقّل (كعنصر مباشر في .woocommerce)
-add_action( 'woocommerce_account_navigation', 'ecm_account_profile_header', 5 );
+// (تم نقل الاختيارات لمنيو منسدلة من صورة الحساب في الهيدر — مش محتاجين الهيدر الكبير)
+// add_action( 'woocommerce_account_navigation', 'ecm_account_profile_header', 5 );
 
 // ── حقل رفع الصورة في صفحة الحساب (بيانات الحساب) ─────────────
 add_action( 'woocommerce_edit_account_form_tag', function () {

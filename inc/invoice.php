@@ -54,6 +54,8 @@ function ecm_render_invoice_html( $order ): void {
     $store_name = get_bloginfo( 'name' );
     $store_url  = home_url( '/' );
     $admin_email = get_option( 'admin_email' );
+    $logo_id    = get_theme_mod( 'custom_logo' );
+    $logo_url   = $logo_id ? wp_get_attachment_image_url( $logo_id, 'full' ) : '';
     $number     = $order->get_order_number();
     $date       = wc_format_datetime( $order->get_date_created(), 'Y/m/d' );
     $green      = '#9cff00';
@@ -78,7 +80,8 @@ function ecm_render_invoice_html( $order ): void {
   .ecm-inv-top { background: #0d0e11; color: #fff; padding: 34px 40px; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; }
   .ecm-inv-brand { font-size: 26px; font-weight: 800; letter-spacing: 1px; }
   .ecm-inv-brand span { color: <?php echo $green; ?>; }
-  .ecm-inv-brand small { display: block; font-size: 12px; color: #9aa0a6; font-weight: 400; margin-top: 4px; letter-spacing: 0; }
+  .ecm-inv-brand small { display: block; font-size: 12px; color: #9aa0a6; font-weight: 400; margin-top: 6px; letter-spacing: 0; }
+  .ecm-inv-logo { max-height: 56px; width: auto; display: block; }
   .ecm-inv-title { text-align: left; }
   .ecm-inv-title h1 { margin: 0; font-size: 30px; letter-spacing: 3px; color: <?php echo $green; ?>; }
   .ecm-inv-title p { margin: 4px 0 0; font-size: 13px; color: #c4c8cc; }
@@ -111,7 +114,11 @@ function ecm_render_invoice_html( $order ): void {
   <div class="ecm-inv">
     <div class="ecm-inv-top">
       <div class="ecm-inv-brand">
-        <?php echo esc_html( $store_name ); ?>
+        <?php if ( $logo_url ) : ?>
+          <img src="<?php echo esc_url( $logo_url ); ?>" alt="<?php echo esc_attr( $store_name ); ?>" class="ecm-inv-logo">
+        <?php else : ?>
+          <?php echo esc_html( $store_name ); ?>
+        <?php endif; ?>
         <small><?php echo esc_html( wp_parse_url( $store_url, PHP_URL_HOST ) ); ?></small>
       </div>
       <div class="ecm-inv-title">

@@ -4,7 +4,7 @@ Theme URI:   https://ecameraman.com
 Author:      E.Camera.Man
 Author URI:  https://ecameraman.com
 Description: ثيم احترافي لموقع ECM — E.Camera.Man مع دعم Elementor كامل
-Version:     3.0.28
+Version:     3.0.29
 License:     GNU General Public License v2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Text Domain: ecm-theme
@@ -4766,15 +4766,26 @@ body.admin-bar #ecm-header {
 .ecm-or-sep::before,
 .ecm-or-sep::after { content: ''; flex: 1; height: 1px; background: var(--ecm-border); }
 
-/* ── أفاتار الحساب في الهيدر (علامة الحساب) ── */
+/* ── أفاتار الحساب في الهيدر + منيو منسدلة ── */
 .ecm-woo-avatar {
-  width: 30px; height: 30px;
+  width: 32px; height: 32px;
   border-radius: 50%;
   border: 2px solid var(--ecm-green);
   vertical-align: middle;
   object-fit: cover;
+  flex-shrink: 0;
 }
-.ecm-woo-account > a { gap: 8px; }
+.ecm-woo-account > a { display: inline-flex; align-items: center; gap: 9px; }
+.ecm-woo-name {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* عناصر المنيو المنسدلة للحساب */
+.ecm-account-sub li a { display: flex; align-items: center; gap: 8px; }
+.ecm-account-sub .ecm-sub-logout a { color: #ff6b6b !important; }
+.ecm-account-sub .ecm-sub-logout a:hover { background: rgba(255,77,77,0.1) !important; color: #ff4d4d !important; }
 
 /* ── حقل رفع صورة الحساب ── */
 .ecm-avatar-field {
