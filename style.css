@@ -4,7 +4,7 @@ Theme URI:   https://ecameraman.com
 Author:      E.Camera.Man
 Author URI:  https://ecameraman.com
 Description: ثيم احترافي لموقع ECM — E.Camera.Man مع دعم Elementor كامل
-Version:     3.0.20
+Version:     3.0.21
 License:     GNU General Public License v2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Text Domain: ecm-theme
@@ -4712,16 +4712,40 @@ body.admin-bar #ecm-header {
   font-size: 14px; margin-bottom: 18px;
 }
 
-/* ── زر تسجيل الدخول بجوجل ── */
+/* ── زر تسجيل الدخول بجوجل (كارت احترافي بارز) ── */
 .ecm-google-login {
-  max-width: 360px;
-  margin: 0 auto 26px;
+  max-width: 440px;
+  margin: 0 auto 28px;
   text-align: center;
 }
-.ecm-g-btn { display: flex; justify-content: center; }
+.ecm-google-card {
+  background: linear-gradient(160deg, var(--ecm-bg-card), #14161a);
+  border: 1px solid var(--ecm-border);
+  border-radius: var(--ecm-radius-md);
+  padding: 24px 22px 26px;
+  box-shadow: 0 14px 40px rgba(0,0,0,0.35);
+  position: relative;
+  overflow: hidden;
+}
+.ecm-google-card::before {
+  content: '';
+  position: absolute; inset: 0 0 auto 0; height: 3px;
+  background: linear-gradient(90deg, transparent, var(--ecm-green), transparent);
+}
+.ecm-google-title {
+  font-family: 'Orbitron','Cairo',sans-serif;
+  color: var(--ecm-white); font-weight: 800; font-size: 18px; margin: 0 0 4px;
+}
+.ecm-google-sub { color: var(--ecm-grey-mid); font-size: 13px; margin: 0 0 18px; }
+.ecm-g-btn {
+  display: flex; justify-content: center;
+  transform: scale(1.12);
+  transform-origin: center;
+  margin: 6px 0;
+}
 .ecm-or-sep {
   display: flex; align-items: center; gap: 12px;
-  margin: 20px 0 4px; color: var(--ecm-grey-mid); font-size: 13px;
+  margin: 22px auto 4px; max-width: 360px; color: var(--ecm-grey-mid); font-size: 13px;
 }
 .ecm-or-sep::before,
 .ecm-or-sep::after { content: ''; flex: 1; height: 1px; background: var(--ecm-border); }
@@ -4753,6 +4777,33 @@ body.admin-bar #ecm-header {
   background: var(--ecm-green);
   color: #0d0e11;
   border-radius: var(--ecm-radius-sm);
+}
+
+/* ── صفحة المتجر الجاهزة ── */
+.ecm-shop-page { max-width: 1180px; margin: 0 auto; }
+.ecm-shop-lead { color: var(--ecm-grey-mid); font-size: 17px; margin-bottom: 30px; }
+.ecm-shop-h {
+  font-family: 'Orbitron','Cairo',sans-serif;
+  color: var(--ecm-white);
+  font-weight: 800;
+  font-size: clamp(20px, 3vw, 28px);
+  margin: 44px 0 22px;
+  padding-inline-start: 14px;
+  border-inline-start: 4px solid var(--ecm-green);
+}
+.ecm-shop-all { margin-top: 36px; }
+.woocommerce ul.products li.product-category h2,
+.woocommerce ul.products li.product-category .woocommerce-loop-category__title {
+  color: var(--ecm-white) !important;
+  font-family: 'Orbitron','Cairo',sans-serif;
+  font-size: 15px !important;
+}
+.woocommerce ul.products li.product-category mark {
+  background: var(--ecm-green);
+  color: #0d0e11;
+  border-radius: 10px;
+  padding: 0 8px;
+  font-weight: 700;
 }
 
 /* ── متجاوب ── */
@@ -5050,6 +5101,72 @@ body.admin-bar #ecm-header {
 @media (max-width: 880px) {
   .woocommerce div.product .related.products ul.products,
   .woocommerce div.product .upsells.products ul.products { grid-template-columns: repeat(2, 1fr); }
+}
+
+
+/* ════════════════════════════════════════════════════════════
+   إصلاحات صفحة المنتج (توسيط + ملء الصورة + تقييمات مظلمة)
+   ════════════════════════════════════════════════════════════ */
+/* توسيط وتحجيم احترافي */
+.single-product .ecm-woo-inner,
+.single-product .ecm-woo-container { max-width: 1140px; margin-inline: auto; }
+.woocommerce div.product {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 40px;
+}
+
+/* الصورة تملأ عمودها بالكامل (حتى لو placeholder) */
+.woocommerce div.product .woocommerce-product-gallery {
+  width: 100% !important;
+  float: none !important;
+  margin: 0 !important;
+  opacity: 1 !important;   /* مهم: WooCommerce بيخفيها لحد ما الـ JS يشتغل */
+}
+.woocommerce div.product .woocommerce-product-gallery__wrapper {
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: none !important;
+}
+.woocommerce div.product .woocommerce-product-gallery__wrapper,
+.woocommerce div.product .woocommerce-product-gallery__image {
+  width: 100% !important;
+  margin: 0 !important;
+}
+.woocommerce div.product .woocommerce-product-gallery img {
+  width: 100% !important;
+  height: auto !important;
+  display: block;
+}
+/* لو مفيش صورة: ارتفاع مناسب للـ placeholder */
+.woocommerce div.product .woocommerce-product-gallery__wrapper { min-height: 320px; }
+
+/* مربع التقييم والحقول — مظلمة بدل الأبيض */
+.woocommerce #reviews #respond textarea,
+.woocommerce #reviews #respond input[type="text"],
+.woocommerce #reviews #respond input[type="email"],
+.woocommerce #review_form #respond textarea {
+  background: var(--ecm-bg-card) !important;
+  border: 1px solid var(--ecm-border) !important;
+  color: var(--ecm-white) !important;
+  border-radius: var(--ecm-radius-sm) !important;
+  padding: 12px 14px !important;
+}
+.woocommerce #reviews #respond textarea:focus,
+.woocommerce #reviews #respond input:focus { border-color: var(--ecm-green) !important; outline: none; }
+.woocommerce #reviews #comments h2,
+.woocommerce #reviews #respond .comment-reply-title,
+.woocommerce #review_form label { color: var(--ecm-white); }
+.woocommerce #reviews .woocommerce-noreviews,
+.woocommerce #reviews .comment-form-rating label { color: var(--ecm-grey-mid); }
+.woocommerce p.stars a { color: var(--ecm-green); }
+
+/* قسم التابات: padding مريح وخلفية */
+.woocommerce div.product .woocommerce-tabs .panel {
+  background: var(--ecm-bg-card);
+  border: 1px solid var(--ecm-border);
+  border-radius: 0 0 var(--ecm-radius-md) var(--ecm-radius-md);
+  padding: 26px;
+  margin-top: 0;
 }
 
 

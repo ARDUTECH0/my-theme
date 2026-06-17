@@ -50,13 +50,17 @@ function ecm_google_button_html(): string {
     ob_start();
     ?>
     <div class="ecm-google-login">
-        <div id="g_id_onload"
-             data-client_id="<?php echo esc_attr( $cid ); ?>"
-             data-callback="ecmGoogleCallback"
-             data-auto_prompt="false"></div>
-        <div class="g_id_signin ecm-g-btn"
-             data-type="standard" data-shape="pill" data-theme="filled_black"
-             data-text="signin_with" data-size="large" data-logo_alignment="left"></div>
+        <div class="ecm-google-card">
+            <p class="ecm-google-title">⚡ <?php esc_html_e( 'دخول سريع', 'ecm-theme' ); ?></p>
+            <p class="ecm-google-sub"><?php esc_html_e( 'ادخل بحسابك في جوجل بضغطة واحدة', 'ecm-theme' ); ?></p>
+            <div id="g_id_onload"
+                 data-client_id="<?php echo esc_attr( $cid ); ?>"
+                 data-callback="ecmGoogleCallback"
+                 data-auto_prompt="false"></div>
+            <div class="g_id_signin ecm-g-btn"
+                 data-type="standard" data-shape="pill" data-theme="filled_black"
+                 data-text="continue_with" data-size="large" data-logo_alignment="left" data-width="360"></div>
+        </div>
         <div class="ecm-or-sep"><span><?php esc_html_e( 'أو سجّل بالإيميل', 'ecm-theme' ); ?></span></div>
         <input type="hidden" id="ecm-g-redirect" value="<?php echo esc_attr( $redirect ); ?>">
     </div>

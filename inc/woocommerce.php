@@ -76,6 +76,49 @@ function ecm_woo_menu_items( $items, $args ) {
 }
 add_filter( 'wp_nav_menu_items', 'ecm_woo_menu_items', 10, 2 );
 
+// ── صفحة متجر احترافية جاهزة (عروض + أحدث + فئات) ──────────────
+function ecm_woo_create_shop_page() {
+    if ( get_option( 'ecm_woo_shop_page_v2' ) ) {
+        return;
+    }
+    if ( ! function_exists( 'ecm_page_by_title' ) || ! function_exists( 'wc_get_page_permalink' ) ) {
+        return;
+    }
+
+    $shop_url = wc_get_page_permalink( 'shop' );
+
+    $content  = '<div class="ecm-shop-page">';
+    $content .= '<p class="ecm-shop-lead" style="text-align:center;">كل منتجات ECM الرقمية في مكان واحد — اشترِ وحمّل فورًا.</p>';
+
+    $content .= '<h2 class="ecm-shop-h">⚡ عروض وخصومات</h2>';
+    $content .= '[sale_products limit="4" columns="4"]';
+
+    $content .= '<h2 class="ecm-shop-h">🆕 أحدث المنتجات</h2>';
+    $content .= '[products limit="8" columns="4" orderby="date" order="DESC" paginate="false"]';
+
+    $content .= '<h2 class="ecm-shop-h">📂 تصفّح حسب الفئة</h2>';
+    $content .= '[product_categories number="6" columns="3" parent="0"]';
+
+    $content .= '<p class="ecm-shop-all" style="text-align:center;"><a class="button" href="' . esc_url( $shop_url ) . '">شوف كل المنتجات</a></p>';
+    $content .= '</div>';
+
+    $existing = ecm_page_by_title( 'متجر ECM' );
+    if ( $existing ) {
+        wp_update_post( [ 'ID' => $existing->ID, 'post_content' => $content, 'post_status' => 'publish' ] );
+        $page_id = $existing->ID;
+    } else {
+        $page_id = wp_insert_post( [
+            'post_title'   => 'متجر ECM',
+            'post_content' => $content,
+            'post_status'  => 'publish',
+            'post_type'    => 'page',
+        ] );
+    }
+
+    update_option( 'ecm_woo_shop_page_v2', 1 );
+}
+add_action( 'admin_init', 'ecm_woo_create_shop_page', 40 );
+
 // ── تحديث عدّاد السلة بالـ AJAX (Add to cart) ─────────────────
 add_filter( 'woocommerce_add_to_cart_fragments', function ( $fragments ) {
     $count = ( function_exists( 'WC' ) && WC()->cart ) ? WC()->cart->get_cart_contents_count() : 0;
