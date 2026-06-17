@@ -277,6 +277,13 @@ function ecm_serials_admin_page() {
         echo '<div class="notice notice-success"><p>' . esc_html__( 'تم فك ربط الجهاز.', 'ecm-theme' ) . '</p></div>';
     }
 
+    // حفظ إعدادات «وضع المتجر المجاني للجميع»
+    if ( isset( $_POST['ecm_save_freestore'] ) && check_admin_referer( 'ecm_serials' ) ) {
+        update_option( 'ecm_free_store', empty( $_POST['ecm_free_store'] ) ? 0 : 1 );
+        update_option( 'ecm_free_store_text', sanitize_text_field( wp_unslash( $_POST['ecm_free_store_text'] ?? '' ) ) );
+        echo '<div class="notice notice-success"><p>' . esc_html__( 'تم حفظ إعدادات المتجر المجاني.', 'ecm-theme' ) . '</p></div>';
+    }
+
     // تبديل «كل المنتجات مجانًا» لجهاز
     if ( isset( $_POST['ecm_toggle_free'], $_POST['ecm_sid'] ) && check_admin_referer( 'ecm_serials' ) ) {
         $val = empty( $_POST['ecm_free_val'] ) ? 0 : 1;
@@ -322,6 +329,25 @@ function ecm_serials_admin_page() {
         </div>
 
         <p><a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=ecm-serials-api' ) ); ?>">🔌 <?php esc_html_e( 'صفحة الـ API والتوكن', 'ecm-theme' ); ?></a></p>
+
+        <div class="ecm-sp-box">
+            <h2>🎁 <?php esc_html_e( 'وضع المتجر المجاني للجميع', 'ecm-theme' ); ?></h2>
+            <p><?php esc_html_e( 'لما تشغّله: يظهر شريط فوق المتجر، وكل المنتجات تبقى ببلاش لكل الزوّار.', 'ecm-theme' ); ?></p>
+            <form method="post">
+                <?php wp_nonce_field( 'ecm_serials' ); ?>
+                <p>
+                    <label>
+                        <input type="checkbox" name="ecm_free_store" value="1" <?php checked( (int) get_option( 'ecm_free_store', 0 ), 1 ); ?>>
+                        <strong><?php esc_html_e( 'تفعيل وضع المتجر المجاني', 'ecm-theme' ); ?></strong>
+                    </label>
+                </p>
+                <p>
+                    <label style="display:block;margin-bottom:4px;"><?php esc_html_e( 'نص الشريط:', 'ecm-theme' ); ?></label>
+                    <input type="text" name="ecm_free_store_text" value="<?php echo esc_attr( get_option( 'ecm_free_store_text', 'أي حاجة تحتاجها ببلاش — كل المنتجات مجانية دلوقتي!' ) ); ?>" style="width:100%;max-width:560px;">
+                </p>
+                <p><button class="button button-primary" name="ecm_save_freestore" value="1"><?php esc_html_e( 'حفظ', 'ecm-theme' ); ?></button></p>
+            </form>
+        </div>
 
         <div class="ecm-sp-box">
             <h2>➕ <?php esc_html_e( 'إضافة سيريالات أصلية', 'ecm-theme' ); ?></h2>
@@ -911,6 +937,46 @@ add_action( 'woocommerce_before_main_content', function () {
     }
     echo '<div class="ecm-free-banner">🎁 ' . esc_html__( 'مبروك! كل المنتجات مجانية لحسابك — أضفها للسلة وأكمل الطلب ببلاش.', 'ecm-theme' ) . '</div>';
 }, 6 );
+
+
+// ════════════════════════════════════════════════════════════
+// §  وضع المتجر المجاني للجميع (شريط عام يتحكم فيه الأدمن)
+// ════════════════════════════════════════════════════════════
+
+/** هل وضع المتجر المجاني مفعّل؟ */
+function ecm_free_store_on(): bool {
+    return (int) get_option( 'ecm_free_store', 0 ) === 1;
+}
+
+/** شريط فوق المتجر لما الوضع المجاني شغّال */
+add_action( 'woocommerce_before_main_content', function () {
+    if ( ! ecm_free_store_on() ) {
+        return;
+    }
+    if ( ! ( is_shop() || is_product() || is_product_category() || is_cart() || is_checkout() ) ) {
+        return;
+    }
+    $text = (string) get_option( 'ecm_free_store_text', '' );
+    if ( '' === $text ) {
+        $text = __( 'أي حاجة تحتاجها ببلاش — كل المنتجات مجانية دلوقتي!', 'ecm-theme' );
+    }
+    echo '<div class="ecm-freestore-bar"><span class="ecm-freestore-tag">🎁 ' . esc_html__( 'مجانًا', 'ecm-theme' ) . '</span> ' . esc_html( $text ) . '</div>';
+}, 3 );
+
+/** تصفير أسعار السلة للجميع لما الوضع المجاني شغّال */
+add_action( 'woocommerce_before_calculate_totals', function ( $cart ) {
+    if ( is_admin() && ! wp_doing_ajax() ) {
+        return;
+    }
+    if ( ! ecm_free_store_on() ) {
+        return;
+    }
+    foreach ( $cart->get_cart() as $item ) {
+        if ( isset( $item['data'] ) && is_object( $item['data'] ) ) {
+            $item['data']->set_price( 0 );
+        }
+    }
+}, 21 );
 
 
 // ════════════════════════════════════════════════════════════
