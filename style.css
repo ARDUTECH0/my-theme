@@ -4,7 +4,7 @@ Theme URI:   https://ecameraman.com
 Author:      E.Camera.Man
 Author URI:  https://ecameraman.com
 Description: ثيم احترافي لموقع ECM — E.Camera.Man مع دعم Elementor كامل
-Version:     3.0.9
+Version:     3.0.10
 License:     GNU General Public License v2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Text Domain: ecm-theme
@@ -1543,10 +1543,31 @@ html { direction: rtl; }
   border-inline: 0;
 }
 
-@media (max-width: 768px) {
-  .ecm-slider-3d__slide { grid-template-columns: 1fr; text-align: center; gap: 14px; padding: 26px 18px 52px; }
+/* ── تأقلم مع الشاشات الصغيرة (تابلت/موبايل) ── */
+@media (max-width: 880px) {
+  .ecm-slider-3d__slide {
+    grid-template-columns: 1fr;          /* عمود واحد: الموديل فوق والنص تحت */
+    grid-template-rows: 1fr auto;
+    align-items: stretch;
+    text-align: center;
+    gap: 12px;
+    padding: 24px 18px 56px;
+  }
+  .ecm-slider-3d__media { height: auto; min-height: 0; }   /* الخلية بتتمدد بالجريد */
+  .ecm-slider-3d__content { align-self: start; }
   .ecm-slider-3d__sub { margin-inline: auto; }
-  .ecm-slider-3d__media { max-height: 45%; }
+  /* وضع الخلفية الكاملة: النص ياخد العرض كله */
+  .ecm-slider-3d--bg .ecm-slider-3d__content { max-width: 100%; }
+}
+
+@media (max-width: 560px) {
+  .ecm-slider-3d__slide { padding: 20px 14px 50px; gap: 10px; }
+  .ecm-slider-3d__sub { font-size: 14px; line-height: 1.7; }
+  .ecm-slider-3d__nav { width: 38px; height: 38px; font-size: 22px; }
+  .ecm-slider-3d__prev { inset-inline-start: 8px; }
+  .ecm-slider-3d__next { inset-inline-end: 8px; }
+  .ecm-slider-3d__zoom { bottom: 12px; inset-inline-end: 12px; }
+  .ecm-slider-3d__zoom-btn { width: 34px; height: 34px; font-size: 18px; }
 }
 
 /* ── Full-width Elementor page template (page-elementor.php) ── */

@@ -170,6 +170,14 @@
     }
     window.addEventListener( 'load', reframeBurst );
 
+    // إعادة تأطير عند تغيير حجم الشاشة/دوران الجهاز (عشان يفضل متأقلم ومتسنتر)
+    var resizeT = null;
+    window.addEventListener( 'resize', function () {
+        if ( resizeT ) { clearTimeout( resizeT ); }
+        resizeT = setTimeout( reframeAll, 250 );
+    } );
+    window.addEventListener( 'orientationchange', function () { setTimeout( reframeAll, 350 ); } );
+
     // التشغيل داخل محرّر Elementor (لما الودجِت يتضاف/يتعدّل)
     if ( window.jQuery ) {
         jQuery( window ).on( 'elementor/frontend/init', function () {
