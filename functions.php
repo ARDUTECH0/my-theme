@@ -376,7 +376,7 @@ add_action( 'wp_enqueue_scripts', 'ecm_enqueue_assets' );
 
 
 // ── THEME VERSION CONSTANT ───────────────────────────────────
-define( 'ECM_VERSION', '3.0.10' );
+define( 'ECM_VERSION', '3.0.11' );
 
 
 // ── INCLUDE: FRONT PAGE CUSTOMIZER ──────────────────────────
@@ -522,6 +522,7 @@ function ecm_register_elementor_widgets() {
         'widget-eyebrow',
         'widget-logo-3d',
         'widget-slider-3d',
+        'widget-control-grid',
     ];
 
     foreach ( $widgets as $widget ) {
@@ -539,6 +540,7 @@ function ecm_register_elementor_widgets() {
         'ECM_Widget_Eyebrow',
         'ECM_Widget_Logo_3D',
         'ECM_Widget_Slider_3D',
+        'ECM_Widget_Control_Grid',
     ];
 
     foreach ( $classes as $class ) {

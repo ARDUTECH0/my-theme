@@ -4,7 +4,7 @@ Theme URI:   https://ecameraman.com
 Author:      E.Camera.Man
 Author URI:  https://ecameraman.com
 Description: ثيم احترافي لموقع ECM — E.Camera.Man مع دعم Elementor كامل
-Version:     3.0.10
+Version:     3.0.11
 License:     GNU General Public License v2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Text Domain: ecm-theme
@@ -1377,6 +1377,95 @@ html { direction: rtl; }
 /* أيقونات Icon Box بلون البراند افتراضيًا */
 .elementor-widget-icon-box .elementor-icon,
 .elementor-widget-icon .elementor-icon { color: var(--ecm-green); }
+
+
+/* ════════════════════════════════════════════════════════════
+   ECM 3D CONTROL GRID (شبكة تحكّم 3D)
+   ════════════════════════════════════════════════════════════ */
+.ecm-cgrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 22px;
+  width: 100%;
+}
+.ecm-cgrid__cell {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.ecm-cgrid__cell--card {
+  background: var(--ecm-bg-card);
+  border: 1px solid var(--ecm-border);
+  border-radius: var(--ecm-radius-md);
+}
+.ecm-cgrid__cell--card:hover { transform: translateY(-4px); }
+.ecm-cgrid__cell--glow:hover {
+  border-color: var(--ecm-green);
+  box-shadow: var(--ecm-shadow-green), inset 0 0 40px rgba(156,255,0,0.04);
+}
+
+/* الإطار: الموديل + السهم فوقه */
+.ecm-cgrid__stage {
+  position: relative;
+  height: 230px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ecm-cgrid__stage model-viewer { width: 100%; height: 100%; }
+.ecm-cgrid__empty {
+  opacity: 0.55;
+  font-size: 13px;
+  text-align: center;
+  padding: 20px;
+}
+
+/* الأسهم */
+.ecm-cgrid__arrow {
+  position: absolute;
+  color: #ff4d2e;
+  pointer-events: none;
+  filter: drop-shadow(0 3px 6px rgba(0,0,0,0.45));
+  z-index: 3;
+}
+.ecm-cgrid__arrow svg { display: block; width: 100%; height: 100%; }
+.ecm-cgrid__arrow svg path { fill: currentColor; }
+.ecm-cgrid__arrow--rotate-cw svg path,
+.ecm-cgrid__arrow--rotate-ccw svg path { fill: none; stroke: currentColor; }
+
+/* مواضع الأسهم حسب الاتجاه */
+.ecm-cgrid__arrow--up         { top: 8%;  inset-inline-end: 16%; width: 30px; height: 46px; }
+.ecm-cgrid__arrow--down       { bottom: 8%; inset-inline-end: 16%; width: 30px; height: 46px; }
+.ecm-cgrid__arrow--left       { top: 42%; inset-inline-start: 6%; width: 46px; height: 30px; }
+.ecm-cgrid__arrow--right      { top: 42%; inset-inline-end: 6%; width: 46px; height: 30px; }
+.ecm-cgrid__arrow--up-down    { top: 50%; transform: translateY(-50%); inset-inline-end: 12%; width: 30px; height: 64px; }
+.ecm-cgrid__arrow--left-right { bottom: 10%; inset-inline: 0; margin-inline: auto; width: 64px; height: 30px; }
+.ecm-cgrid__arrow--rotate-cw,
+.ecm-cgrid__arrow--rotate-ccw { top: 10%; inset-inline-end: 12%; width: 50px; height: 50px; }
+
+/* الشرح تحت الموديل */
+.ecm-cgrid__body { padding: 16px 18px 20px; text-align: center; }
+.ecm-cgrid__title {
+  font-family: 'Orbitron', 'Cairo', sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ecm-white);
+  margin: 0 0 6px;
+}
+.ecm-cgrid__desc {
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--ecm-grey-mid);
+  margin: 0;
+}
+
+@media (max-width: 880px) {
+  .ecm-cgrid { grid-template-columns: repeat(2, 1fr); gap: 16px; }
+}
+@media (max-width: 560px) {
+  .ecm-cgrid { grid-template-columns: 1fr; }
+}
 
 
 /* ════════════════════════════════════════════════════════════
