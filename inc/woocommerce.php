@@ -229,3 +229,124 @@ add_action( 'woocommerce_before_account_downloads', function () {
 add_filter( 'woocommerce_account_downloads_columns', function ( $columns ) {
     return $columns; // نسيب الأعمدة زي ما هي
 } );
+
+
+// ════════════════════════════════════════════════════════════
+//  تعريب مصطلحات WooCommerce (دخول/حساب/سلة/دفع/منتج/تقييمات)
+// ════════════════════════════════════════════════════════════
+function ecm_woo_arabic_strings(): array {
+    return [
+        // تسجيل الدخول / الحساب
+        'Login'                              => 'تسجيل الدخول',
+        'Log in'                             => 'تسجيل الدخول',
+        'Log out'                            => 'تسجيل الخروج',
+        'Register'                           => 'إنشاء حساب',
+        'Username or email address'          => 'اسم المستخدم أو البريد الإلكتروني',
+        'Username or email'                  => 'اسم المستخدم أو البريد الإلكتروني',
+        'Username'                           => 'اسم المستخدم',
+        'Email address'                      => 'البريد الإلكتروني',
+        'Email'                              => 'البريد الإلكتروني',
+        'Password'                           => 'كلمة المرور',
+        'Remember me'                        => 'تذكّرني',
+        'Lost your password?'                => 'نسيت كلمة المرور؟',
+        'Reset password'                     => 'إعادة تعيين كلمة المرور',
+        'A link to set a new password will be sent to your email address.' => 'هيتبعتلك رابط على بريدك لتعيين كلمة مرور جديدة.',
+        'Register an account?'               => 'إنشاء حساب جديد؟',
+
+        // قائمة الحساب
+        'My account'                         => 'حسابي',
+        'Dashboard'                          => 'الرئيسية',
+        'Orders'                             => 'الطلبات',
+        'Downloads'                          => 'التحميلات',
+        'Addresses'                          => 'العناوين',
+        'Account details'                    => 'بيانات الحساب',
+        'Payment methods'                    => 'طرق الدفع',
+        'First name'                         => 'الاسم الأول',
+        'Last name'                          => 'الاسم الأخير',
+        'Display name'                       => 'الاسم الظاهر',
+        'Current password'                   => 'كلمة المرور الحالية',
+        'New password'                       => 'كلمة المرور الجديدة',
+        'Confirm new password'               => 'تأكيد كلمة المرور الجديدة',
+        'Save changes'                       => 'حفظ التغييرات',
+
+        // المتجر / المنتج
+        'Add to cart'                        => 'أضف إلى السلة',
+        'Read more'                          => 'اقرأ المزيد',
+        'Select options'                     => 'اختر الخيارات',
+        'Sale!'                              => 'تخفيض!',
+        'In stock'                           => 'متوفر',
+        'Out of stock'                       => 'غير متوفر',
+        'Category:'                          => 'الفئة:',
+        'Categories:'                        => 'الفئات:',
+        'Tag:'                               => 'الوسم:',
+        'Tags:'                              => 'الوسوم:',
+        'SKU:'                               => 'رقم المنتج:',
+        'Description'                        => 'الوصف',
+        'Additional information'             => 'معلومات إضافية',
+        'Related products'                   => 'منتجات ذات صلة',
+        'You may also like&hellip;'          => 'قد يعجبك أيضًا…',
+        'Quantity'                           => 'الكمية',
+
+        // التقييمات
+        'Reviews'                            => 'التقييمات',
+        'Your rating'                        => 'تقييمك',
+        'Your review'                        => 'مراجعتك',
+        'There are no reviews yet.'          => 'لا توجد تقييمات بعد.',
+        'Submit'                             => 'إرسال',
+        'Name'                               => 'الاسم',
+
+        // السلة
+        'Cart'                               => 'السلة',
+        'Cart totals'                        => 'إجمالي السلة',
+        'Product'                            => 'المنتج',
+        'Price'                              => 'السعر',
+        'Subtotal'                           => 'المجموع الفرعي',
+        'Total'                              => 'الإجمالي',
+        'Update cart'                        => 'تحديث السلة',
+        'Apply coupon'                       => 'تطبيق الكوبون',
+        'Coupon code'                        => 'كود الخصم',
+        'Proceed to checkout'                => 'إتمام الشراء',
+        'Return to shop'                     => 'العودة للمتجر',
+        'Your cart is currently empty.'      => 'سلتك فارغة حاليًا.',
+        'Remove this item'                   => 'إزالة هذا المنتج',
+
+        // الدفع
+        'Checkout'                           => 'الدفع',
+        'Billing details'                    => 'بيانات الفاتورة',
+        'Your order'                         => 'طلبك',
+        'Place order'                        => 'تأكيد الطلب',
+        'Phone'                              => 'رقم الهاتف',
+        'Order notes'                        => 'ملاحظات الطلب',
+        'Have a coupon?'                     => 'عندك كوبون؟',
+        'Click here to enter your code'      => 'اضغط هنا لإدخال الكود',
+
+        // عام
+        'Search'                             => 'بحث',
+        'Search&hellip;'                     => 'بحث…',
+        'Continue'                           => 'متابعة',
+    ];
+}
+
+// تطبيق الترجمة على نصوص WooCommerce
+add_filter( 'gettext', function ( $translated, $text, $domain ) {
+    if ( 'woocommerce' !== $domain ) {
+        return $translated;
+    }
+    static $map = null;
+    if ( null === $map ) {
+        $map = ecm_woo_arabic_strings();
+    }
+    return $map[ $text ] ?? $translated;
+}, 20, 3 );
+
+// نصوص فيها سياق (gettext_with_context)
+add_filter( 'gettext_with_context', function ( $translated, $text, $context, $domain ) {
+    if ( 'woocommerce' !== $domain ) {
+        return $translated;
+    }
+    static $map = null;
+    if ( null === $map ) {
+        $map = ecm_woo_arabic_strings();
+    }
+    return $map[ $text ] ?? $translated;
+}, 20, 4 );
