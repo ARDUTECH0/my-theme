@@ -4,7 +4,7 @@ Theme URI:   https://ecameraman.com
 Author:      E.Camera.Man
 Author URI:  https://ecameraman.com
 Description: ثيم احترافي لموقع ECM — E.Camera.Man مع دعم Elementor كامل
-Version:     3.0.12
+Version:     3.0.13
 License:     GNU General Public License v2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Text Domain: ecm-theme
@@ -1427,32 +1427,6 @@ html { direction: rtl; }
 .ecm-cgrid__stage--zoom .ecm-cgrid__img { transition: transform 0.3s ease; }
 .ecm-cgrid__stage--zoom:hover .ecm-cgrid__img { transform: scale(1.04); }
 
-/* أيقونة التكبير */
-.ecm-cgrid__zoom-ic {
-  position: absolute;
-  top: 10px;
-  inset-inline-start: 10px;
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
-  background: rgba(13,14,17,0.6);
-  border: 1px solid var(--ecm-border);
-  color: var(--ecm-white);
-  font-size: 15px;
-  line-height: 1;
-  cursor: zoom-in;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  z-index: 4;
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
-  transition: opacity 0.2s ease, background 0.2s ease, color 0.2s ease;
-}
-.ecm-cgrid__cell:hover .ecm-cgrid__zoom-ic { opacity: 1; }
-.ecm-cgrid__zoom-ic:hover { background: var(--ecm-green); color: #0d0e11; border-color: var(--ecm-green); }
-
 /* الأسهم */
 .ecm-cgrid__arrow {
   position: absolute;
@@ -1491,13 +1465,16 @@ html { direction: rtl; }
   color: var(--ecm-grey-mid);
   margin: 0;
 }
+.ecm-cgrid__btn {
+  display: inline-block;
+  margin-top: 14px;
+}
 
 @media (max-width: 880px) {
   .ecm-cgrid { grid-template-columns: repeat(2, 1fr); gap: 16px; }
 }
 @media (max-width: 560px) {
   .ecm-cgrid { grid-template-columns: 1fr; }
-  .ecm-cgrid__zoom-ic { opacity: 1; }
 }
 
 /* لايت‌بوكس تكبير الصور */

@@ -91,29 +91,41 @@ class ECM_Widget_Control_Grid extends \Elementor\Widget_Base {
         $rep->add_control( 'title', [
             'label'       => __( 'العنوان', 'ecm-theme' ),
             'type'        => \Elementor\Controls_Manager::TEXT,
-            'default'     => __( 'تحريك', 'ecm-theme' ),
+            'placeholder' => __( 'اكتب العنوان…', 'ecm-theme' ),
             'label_block' => true,
         ] );
 
         $rep->add_control( 'desc', [
-            'label'   => __( 'الوصف', 'ecm-theme' ),
-            'type'    => \Elementor\Controls_Manager::TEXTAREA,
-            'rows'    => 3,
-            'default' => __( 'اكتب شرح الحركة دي هنا.', 'ecm-theme' ),
+            'label'       => __( 'الوصف', 'ecm-theme' ),
+            'type'        => \Elementor\Controls_Manager::TEXTAREA,
+            'rows'        => 3,
+            'placeholder' => __( 'اكتب الوصف…', 'ecm-theme' ),
+        ] );
+
+        $rep->add_control( 'btn_text', [
+            'label'       => __( 'نص الزر (اختياري)', 'ecm-theme' ),
+            'type'        => \Elementor\Controls_Manager::TEXT,
+            'placeholder' => __( 'مثال: اعرف أكتر', 'ecm-theme' ),
+            'label_block' => true,
+        ] );
+
+        $rep->add_control( 'btn_link', [
+            'label'       => __( 'رابط الزر (الصفحة)', 'ecm-theme' ),
+            'type'        => \Elementor\Controls_Manager::URL,
+            'placeholder' => __( 'اختار صفحة أو الصق الرابط', 'ecm-theme' ),
+            'autocomplete'=> true,
+            'condition'   => [ 'btn_text!' => '' ],
         ] );
 
         $this->add_control( 'cells', [
             'label'       => __( 'الخلايا', 'ecm-theme' ),
             'type'        => \Elementor\Controls_Manager::REPEATER,
             'fields'      => $rep->get_controls(),
-            'title_field' => '{{{ title }}}',
+            'title_field' => '{{{ title || "خلية" }}}',
             'default'     => [
-                [ 'arrow' => 'up-down',    'title' => __( 'تحريك رأسي', 'ecm-theme' ),   'desc' => __( 'يحرّك الكاميرا لفوق ولتحت.', 'ecm-theme' ) ],
-                [ 'arrow' => 'left-right', 'title' => __( 'تحريك أفقي', 'ecm-theme' ),   'desc' => __( 'يحرّك الكاميرا يمين وشمال.', 'ecm-theme' ) ],
-                [ 'arrow' => 'rotate-cw',  'title' => __( 'تدوير', 'ecm-theme' ),        'desc' => __( 'يلفّ الكاميرا حوالين المحور.', 'ecm-theme' ) ],
-                [ 'arrow' => 'up',         'title' => __( 'رفع', 'ecm-theme' ),          'desc' => __( 'يرفع الكاميرا لأعلى.', 'ecm-theme' ) ],
-                [ 'arrow' => 'left',       'title' => __( 'إمالة شمال', 'ecm-theme' ),   'desc' => __( 'يميل الكاميرا ناحية الشمال.', 'ecm-theme' ) ],
-                [ 'arrow' => 'right',      'title' => __( 'إمالة يمين', 'ecm-theme' ),   'desc' => __( 'يميل الكاميرا ناحية اليمين.', 'ecm-theme' ) ],
+                [ 'arrow' => 'up-down' ],
+                [ 'arrow' => 'left-right' ],
+                [ 'arrow' => 'rotate-cw' ],
             ],
         ] );
 
@@ -321,9 +333,6 @@ class ECM_Widget_Control_Grid extends \Elementor\Widget_Base {
                     echo '<span class="ecm-cgrid__arrow ecm-cgrid__arrow--' . esc_attr( $dir ) . '">' . $svg . '</span>';
                 }
             }
-            if ( $can_zoom ) {
-                echo '<button type="button" class="ecm-cgrid__zoom-ic" data-ecm-lb="' . esc_url( $popup ) . '" aria-label="' . esc_attr__( 'تكبير', 'ecm-theme' ) . '">⛶</button>';
-            }
             echo '</div>';
 
             // ── الشرح ──
@@ -333,6 +342,12 @@ class ECM_Widget_Control_Grid extends \Elementor\Widget_Base {
             }
             if ( ! empty( $cell['desc'] ) ) {
                 echo '<p class="ecm-cgrid__desc">' . nl2br( esc_html( $cell['desc'] ) ) . '</p>';
+            }
+            if ( ! empty( $cell['btn_text'] ) ) {
+                $url = ! empty( $cell['btn_link']['url'] ) ? $cell['btn_link']['url'] : '#';
+                $tgt = ! empty( $cell['btn_link']['is_external'] ) ? ' target="_blank"' : '';
+                $rel = ! empty( $cell['btn_link']['nofollow'] ) ? ' rel="nofollow"' : '';
+                echo '<a class="ecm-btn-primary ecm-cgrid__btn" href="' . esc_url( $url ) . '"' . $tgt . $rel . '>' . esc_html( $cell['btn_text'] ) . '</a>';
             }
             echo '</div>';
 
