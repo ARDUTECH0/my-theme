@@ -49,6 +49,48 @@ add_action( 'woocommerce_after_main_content', function () {
 add_filter( 'loop_shop_columns', function () { return 3; }, 20 );
 add_filter( 'loop_shop_per_page', function () { return 12; }, 20 );
 
+// ── شريط التصنيفات فوق المتجر (احترافي) ───────────────────────
+add_action( 'woocommerce_before_shop_loop', 'ecm_shop_category_nav', 5 );
+function ecm_shop_category_nav() {
+    if ( ! ( is_shop() || is_product_category() ) ) {
+        return;
+    }
+    $cats = get_terms( [ 'taxonomy' => 'product_cat', 'hide_empty' => true, 'parent' => 0 ] );
+    if ( is_wp_error( $cats ) || empty( $cats ) ) {
+        return;
+    }
+    $current = is_product_category() ? get_queried_object_id() : 0;
+
+    echo '<nav class="ecm-shop-cats" aria-label="' . esc_attr__( 'تصنيفات المنتجات', 'ecm-theme' ) . '">';
+    echo '<a class="ecm-shop-cat' . ( $current ? '' : ' is-active' ) . '" href="' . esc_url( wc_get_page_permalink( 'shop' ) ) . '">' . esc_html__( '🗂️ الكل', 'ecm-theme' ) . '</a>';
+    foreach ( $cats as $cat ) {
+        $active = ( (int) $cat->term_id === (int) $current ) ? ' is-active' : '';
+        echo '<a class="ecm-shop-cat' . $active . '" href="' . esc_url( get_term_link( $cat ) ) . '">'
+            . esc_html( $cat->name ) . ' <span>' . (int) $cat->count . '</span></a>';
+    }
+    echo '</nav>';
+}
+
+// ── لوحة احترافية في رئيسية الحساب ────────────────────────────
+add_action( 'woocommerce_account_dashboard', 'ecm_account_dashboard_cards', 5 );
+function ecm_account_dashboard_cards() {
+    $u      = wp_get_current_user();
+    $avatar = get_avatar( $u->ID, 64, '', $u->display_name, [ 'class' => 'ecm-dash-avatar' ] );
+    $links  = [
+        [ 'orders', '🧾', __( 'الطلبات', 'ecm-theme' ) ],
+        [ 'downloads', '⬇', __( 'التحميلات', 'ecm-theme' ) ],
+        [ 'my-devices', '🛡️', __( 'أجهزتي', 'ecm-theme' ) ],
+        [ 'edit-account', '⚙', __( 'بيانات الحساب', 'ecm-theme' ) ],
+    ];
+    echo '<div class="ecm-dash">';
+    echo '<div class="ecm-dash-head">' . $avatar . '<div class="ecm-dash-meta"><h3>' . esc_html( $u->display_name ) . '</h3><span>' . esc_html( $u->user_email ) . '</span></div></div>';
+    echo '<div class="ecm-dash-grid">';
+    foreach ( $links as $l ) {
+        echo '<a class="ecm-dash-card" href="' . esc_url( wc_get_account_endpoint_url( $l[0] ) ) . '"><span class="ic">' . $l[1] . '</span><span class="t">' . esc_html( $l[2] ) . '</span></a>';
+    }
+    echo '</div></div>';
+}
+
 // ── دخول/خروج · حساب · سلة في القائمة الرئيسية ────────────────
 function ecm_woo_menu_items( $items, $args ) {
     if ( empty( $args->theme_location ) || 'primary-menu' !== $args->theme_location ) {

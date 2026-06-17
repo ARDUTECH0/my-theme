@@ -4,7 +4,7 @@ Theme URI:   https://ecameraman.com
 Author:      E.Camera.Man
 Author URI:  https://ecameraman.com
 Description: ثيم احترافي لموقع ECM — E.Camera.Man مع دعم Elementor كامل
-Version:     3.0.34
+Version:     3.0.35
 License:     GNU General Public License v2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Text Domain: ecm-theme
@@ -4426,6 +4426,35 @@ body.admin-bar #ecm-header {
   max-width: 1200px;
   margin: 0 auto;
 }
+
+/* ── شريط تصنيفات المتجر ── */
+.ecm-shop-cats {
+  display: flex; flex-wrap: wrap; gap: 10px;
+  margin: 0 0 26px; padding-bottom: 22px;
+  border-bottom: 1px solid var(--ecm-border);
+}
+.ecm-shop-cat {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 9px 18px; border-radius: 30px;
+  background: var(--ecm-bg-card); border: 1px solid var(--ecm-border);
+  color: var(--ecm-grey-light); font-size: 14px; font-weight: 600;
+  transition: border-color .2s, color .2s, background .2s, transform .15s;
+}
+.ecm-shop-cat span {
+  font-size: 11px; background: rgba(255,255,255,0.08);
+  padding: 1px 8px; border-radius: 20px; color: var(--ecm-grey-mid);
+}
+.ecm-shop-cat:hover { transform: translateY(-2px); border-color: var(--ecm-green); color: var(--ecm-white); }
+.ecm-shop-cat.is-active { background: var(--ecm-green); border-color: var(--ecm-green); color: #0d0e11; }
+.ecm-shop-cat.is-active span { background: rgba(0,0,0,0.15); color: #0d0e11; }
+
+/* ── عدّاد النتائج + الترتيب ── */
+.woocommerce .woocommerce-result-count { color: var(--ecm-grey-mid); font-size: 13.5px; padding-top: 8px; }
+.woocommerce .woocommerce-ordering select {
+  background: var(--ecm-bg-card) !important; border: 1px solid var(--ecm-border) !important;
+  color: var(--ecm-white) !important; border-radius: var(--ecm-radius-sm) !important; padding: 9px 12px !important;
+}
+
 .woocommerce-products-header__title,
 .ecm-woo .entry-title,
 .ecm-woo h1.product_title {
@@ -4639,17 +4668,50 @@ body.admin-bar #ecm-header {
 .woocommerce-account:not(.logged-in) .woocommerce > .u-column1,
 .woocommerce-account:not(.logged-in) .woocommerce > .u-column2 { flex: 1 1 320px; margin: 0 !important; }
 
-/* قائمة الحساب الجانبية */
-.woocommerce-account .woocommerce-MyAccount-navigation ul { border: none; }
-.woocommerce-account .woocommerce-MyAccount-navigation li {
+/* قائمة الحساب الجانبية ككارت */
+.woocommerce-account.logged-in .woocommerce-MyAccount-navigation {
   background: var(--ecm-bg-card);
   border: 1px solid var(--ecm-border);
-  border-radius: var(--ecm-radius-sm);
-  margin-bottom: 8px;
+  border-radius: var(--ecm-radius-md);
+  padding: 10px;
 }
-.woocommerce-account .woocommerce-MyAccount-navigation li.is-active { border-color: var(--ecm-green); }
-.woocommerce-account .woocommerce-MyAccount-navigation li a { color: var(--ecm-white); display: block; padding: 12px 16px; }
-.woocommerce-account .woocommerce-MyAccount-navigation li.is-active a { color: var(--ecm-green); }
+.woocommerce-account .woocommerce-MyAccount-navigation ul { border: none; margin: 0; }
+.woocommerce-account .woocommerce-MyAccount-navigation li {
+  background: transparent;
+  border: none;
+  border-radius: var(--ecm-radius-sm);
+  margin-bottom: 2px;
+  transition: background .15s ease;
+}
+.woocommerce-account .woocommerce-MyAccount-navigation li:hover { background: rgba(255,255,255,0.04); }
+.woocommerce-account .woocommerce-MyAccount-navigation li.is-active { background: var(--ecm-green-subtle); }
+.woocommerce-account .woocommerce-MyAccount-navigation li a { color: var(--ecm-grey-light); display: block; padding: 12px 14px; border-radius: var(--ecm-radius-sm); }
+.woocommerce-account .woocommerce-MyAccount-navigation li.is-active a { color: var(--ecm-green); font-weight: 700; }
+
+/* منطقة المحتوى ككارت */
+.woocommerce-account.logged-in .woocommerce-MyAccount-content {
+  background: var(--ecm-bg-card);
+  border: 1px solid var(--ecm-border);
+  border-radius: var(--ecm-radius-md);
+  padding: 28px 30px;
+}
+
+/* لوحة رئيسية الحساب */
+.ecm-dash-head { display: flex; align-items: center; gap: 16px; margin-bottom: 22px; padding-bottom: 20px; border-bottom: 1px solid var(--ecm-border); }
+.ecm-dash-avatar { width: 64px; height: 64px; border-radius: 50%; border: 2px solid var(--ecm-green); object-fit: cover; }
+.ecm-dash-meta h3 { margin: 0 0 3px; font-family: 'Orbitron','Cairo',sans-serif; color: var(--ecm-white); font-size: 20px; }
+.ecm-dash-meta span { color: var(--ecm-grey-mid); font-size: 13px; }
+.ecm-dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 14px; }
+.ecm-dash-card {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 22px 14px; border-radius: var(--ecm-radius-md);
+  background: #0f1115; border: 1px solid var(--ecm-border);
+  color: var(--ecm-grey-light); text-align: center;
+  transition: transform .18s ease, border-color .18s ease, color .18s ease;
+}
+.ecm-dash-card .ic { font-size: 26px; }
+.ecm-dash-card .t { font-size: 13.5px; font-weight: 600; }
+.ecm-dash-card:hover { transform: translateY(-3px); border-color: var(--ecm-green); color: var(--ecm-white); }
 
 /* ── السلة والدفع: الجداول ── */
 .woocommerce table.shop_table {
