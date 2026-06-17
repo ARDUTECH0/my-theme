@@ -61,10 +61,12 @@ function ecm_woo_menu_items( $items, $args ) {
     $account_url = get_permalink( wc_get_page_id( 'myaccount' ) );
 
     if ( is_user_logged_in() ) {
-        $items .= '<li class="menu-item ecm-woo-menu ecm-woo-account"><a href="' . esc_url( $account_url ) . '"><span class="ecm-woo-ic">👤</span>' . esc_html__( 'حسابي', 'ecm-theme' ) . '</a></li>';
-        $items .= '<li class="menu-item ecm-woo-menu ecm-woo-logout"><a href="' . esc_url( wp_logout_url( home_url( '/' ) ) ) . '"><span class="ecm-woo-ic">↩</span>' . esc_html__( 'خروج', 'ecm-theme' ) . '</a></li>';
+        $current = wp_get_current_user();
+        $avatar  = get_avatar( $current->ID, 30, '', $current->display_name, [ 'class' => 'ecm-woo-avatar' ] );
+        $items  .= '<li class="menu-item ecm-woo-menu ecm-woo-account"><a href="' . esc_url( $account_url ) . '" title="' . esc_attr( $current->display_name ) . '">' . $avatar . '<span>' . esc_html__( 'حسابي', 'ecm-theme' ) . '</span></a></li>';
+        $items  .= '<li class="menu-item ecm-woo-menu ecm-woo-logout"><a href="' . esc_url( wp_logout_url( home_url( '/' ) ) ) . '"><span class="ecm-woo-ic">↩</span>' . esc_html__( 'خروج', 'ecm-theme' ) . '</a></li>';
     } else {
-        $items .= '<li class="menu-item ecm-woo-menu ecm-woo-login"><a href="' . esc_url( $account_url ) . '"><span class="ecm-woo-ic">🔑</span>' . esc_html__( 'دخول', 'ecm-theme' ) . '</a></li>';
+        $items .= '<li class="menu-item ecm-woo-menu ecm-woo-login"><a href="' . esc_url( $account_url ) . '"><span class="ecm-woo-ic">👤</span>' . esc_html__( 'دخول', 'ecm-theme' ) . '</a></li>';
     }
 
     $count = ( function_exists( 'WC' ) && WC()->cart ) ? WC()->cart->get_cart_contents_count() : 0;

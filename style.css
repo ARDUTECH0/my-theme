@@ -4,7 +4,7 @@ Theme URI:   https://ecameraman.com
 Author:      E.Camera.Man
 Author URI:  https://ecameraman.com
 Description: ثيم احترافي لموقع ECM — E.Camera.Man مع دعم Elementor كامل
-Version:     3.0.18
+Version:     3.0.19
 License:     GNU General Public License v2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Text Domain: ecm-theme
@@ -4711,6 +4711,30 @@ body.admin-bar #ecm-header {
   padding: 12px 16px; color: var(--ecm-grey-light);
   font-size: 14px; margin-bottom: 18px;
 }
+
+/* ── زر تسجيل الدخول بجوجل ── */
+.ecm-google-login {
+  max-width: 360px;
+  margin: 0 auto 26px;
+  text-align: center;
+}
+.ecm-g-btn { display: flex; justify-content: center; }
+.ecm-or-sep {
+  display: flex; align-items: center; gap: 12px;
+  margin: 20px 0 4px; color: var(--ecm-grey-mid); font-size: 13px;
+}
+.ecm-or-sep::before,
+.ecm-or-sep::after { content: ''; flex: 1; height: 1px; background: var(--ecm-border); }
+
+/* ── أفاتار الحساب في الهيدر (علامة الحساب) ── */
+.ecm-woo-avatar {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  border: 2px solid var(--ecm-green);
+  vertical-align: middle;
+  object-fit: cover;
+}
+.ecm-woo-account > a { gap: 8px; }
 
 /* ── ترقيم الصفحات ── */
 .woocommerce nav.woocommerce-pagination ul { border: none; gap: 6px; display: flex; justify-content: center; }
