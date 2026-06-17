@@ -4,7 +4,7 @@ Theme URI:   https://ecameraman.com
 Author:      E.Camera.Man
 Author URI:  https://ecameraman.com
 Description: ثيم احترافي لموقع ECM — E.Camera.Man مع دعم Elementor كامل
-Version:     3.0.19
+Version:     3.0.20
 License:     GNU General Public License v2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Text Domain: ecm-theme
@@ -4762,6 +4762,294 @@ body.admin-bar #ecm-header {
 @media (max-width: 560px) {
   .woocommerce ul.products { grid-template-columns: 1fr; }
   .woocommerce-account:not(.logged-in) .woocommerce { flex-direction: column; }
+}
+
+
+/* ════════════════════════════════════════════════════════════
+   WOOCOMMERCE PRO — صفحة المنتج / السلة / الدخول (لمسات احترافية)
+   ════════════════════════════════════════════════════════════ */
+
+/* ── صفحة المنتج: تخطيط احترافي عمودين ── */
+.single-product .ecm-woo-inner { max-width: 1180px; }
+.woocommerce div.product {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 48px;
+  align-items: start;
+}
+.woocommerce div.product .woocommerce-product-gallery { margin: 0; }
+.woocommerce div.product > .woocommerce-product-gallery {
+  position: relative;
+}
+.woocommerce div.product .woocommerce-product-gallery__wrapper {
+  border-radius: var(--ecm-radius-md);
+  overflow: hidden;
+  border: 1px solid var(--ecm-border);
+  background: var(--ecm-bg-card);
+}
+.woocommerce div.product .woocommerce-product-gallery img { border-radius: 0; }
+.woocommerce div.product .flex-control-thumbs { margin-top: 12px; gap: 10px; display: flex; padding: 0; }
+.woocommerce div.product .flex-control-thumbs li { width: 72px !important; margin: 0 !important; }
+.woocommerce div.product .flex-control-thumbs img {
+  border-radius: var(--ecm-radius-sm);
+  border: 1px solid var(--ecm-border);
+  opacity: 0.6;
+  transition: opacity 0.2s ease, border-color 0.2s ease;
+}
+.woocommerce div.product .flex-control-thumbs img.flex-active,
+.woocommerce div.product .flex-control-thumbs img:hover { opacity: 1; border-color: var(--ecm-green); }
+
+/* الملخّص (يمين النص) ككارت احترافي */
+.woocommerce div.product .summary.entry-summary {
+  margin: 0 !important;
+  width: auto !important;
+  float: none !important;
+  background: var(--ecm-bg-card);
+  border: 1px solid var(--ecm-border);
+  border-radius: var(--ecm-radius-md);
+  padding: 32px;
+  position: sticky;
+  top: 100px;
+}
+.woocommerce div.product .product_title {
+  font-family: 'Orbitron','Cairo',sans-serif;
+  font-weight: 800;
+  line-height: 1.2;
+  margin-bottom: 14px;
+}
+/* شارة رقمي فوق العنوان (تظهر بـ PHP للمنتجات الرقمية فقط) */
+.ecm-single-digital {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--ecm-green);
+  border: 1px solid var(--ecm-green);
+  border-radius: 20px;
+  padding: 4px 12px;
+  margin-bottom: 14px;
+}
+.woocommerce div.product p.price,
+.woocommerce div.product span.price {
+  display: block;
+  padding-bottom: 18px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--ecm-border);
+}
+.woocommerce div.product p.price del { font-size: 18px; }
+.woocommerce div.product p.price ins { text-decoration: none; }
+
+/* منطقة الكمية + زر الشراء */
+.woocommerce div.product form.cart {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 22px 0;
+  flex-wrap: wrap;
+}
+.woocommerce div.product form.cart .quantity .qty { width: 80px; text-align: center; font-weight: 700; }
+.woocommerce div.product form.cart .single_add_to_cart_button {
+  flex: 1;
+  min-width: 200px;
+  padding: 15px 30px !important;
+  font-size: 15px !important;
+}
+.woocommerce div.product .product_meta {
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid var(--ecm-border);
+  font-size: 13px;
+  color: var(--ecm-grey-mid);
+}
+.woocommerce div.product .product_meta a { color: var(--ecm-green); }
+.woocommerce div.product .woocommerce-product-rating { margin-bottom: 12px; }
+.woocommerce .star-rating span { color: var(--ecm-green); }
+
+/* التابات تحت بعرض كامل */
+.woocommerce div.product .woocommerce-tabs,
+.woocommerce div.product .related.products,
+.woocommerce div.product .upsells.products {
+  grid-column: 1 / -1;
+  margin-top: 20px;
+}
+.woocommerce div.product .related.products > h2,
+.woocommerce div.product .upsells.products > h2 {
+  font-family: 'Orbitron','Cairo',sans-serif;
+  color: var(--ecm-white);
+  font-weight: 800;
+  margin-bottom: 24px;
+}
+.woocommerce #reviews .comment-text {
+  background: var(--ecm-bg-card);
+  border: 1px solid var(--ecm-border);
+  border-radius: var(--ecm-radius-md);
+  padding: 18px;
+}
+
+/* ── صفحة السلة: تخطيط احترافي ── */
+.woocommerce-cart .woocommerce {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+.woocommerce-cart .woocommerce-notices-wrapper,
+.woocommerce-cart form.woocommerce-cart-form { grid-column: 1; }
+.woocommerce-cart .cart-collaterals { grid-column: 2; width: auto !important; float: none !important; }
+.woocommerce-cart .cart-collaterals .cart_totals { width: auto !important; float: none !important; position: sticky; top: 100px; }
+.woocommerce-cart .cart_totals h2 {
+  font-family: 'Orbitron','Cairo',sans-serif;
+  color: var(--ecm-white);
+  font-size: 20px;
+  margin-bottom: 16px;
+}
+.woocommerce-cart table.cart td.actions .coupon .input-text { width: 160px; }
+.woocommerce-cart .wc-proceed-to-checkout a.checkout-button {
+  display: block;
+  text-align: center;
+  font-size: 15px !important;
+  padding: 16px !important;
+}
+.woocommerce a.remove {
+  color: #ff4d4d !important;
+  border: 1px solid var(--ecm-border);
+}
+.woocommerce a.remove:hover { background: #ff4d4d !important; color: #fff !important; }
+
+/* ── صفحة الدخول: زر بعرض كامل + تباعد ── */
+.woocommerce form.login .form-row button,
+.woocommerce form.register .form-row button {
+  width: 100%;
+  padding: 14px !important;
+  font-size: 15px !important;
+}
+.woocommerce form.login .form-row,
+.woocommerce form.register .form-row { margin-bottom: 16px; }
+.woocommerce-form-login__rememberme { color: var(--ecm-grey-mid); }
+.woocommerce-LostPassword a { color: var(--ecm-green); }
+
+/* ── متجاوب للصفحات الداخلية ── */
+@media (max-width: 860px) {
+  .woocommerce div.product { grid-template-columns: 1fr; gap: 28px; }
+  .woocommerce div.product .summary.entry-summary { position: static; }
+  .woocommerce-cart .woocommerce { grid-template-columns: 1fr; }
+  .woocommerce-cart .cart-collaterals,
+  .woocommerce-cart form.woocommerce-cart-form { grid-column: 1; }
+  .woocommerce-cart .cart-collaterals .cart_totals { position: static; }
+}
+
+
+/* ════════════════════════════════════════════════════════════
+   WOOCOMMERCE BLOCKS — السلة/الدفع الجديدة (Gutenberg)
+   ════════════════════════════════════════════════════════════ */
+.wp-block-woocommerce-cart,
+.wp-block-woocommerce-checkout { color: var(--ecm-grey-light); }
+
+/* العناوين */
+.wc-block-components-title,
+.wc-block-cart__totals-title,
+.wp-block-woocommerce-checkout .wc-block-components-checkout-step__title {
+  font-family: 'Orbitron','Cairo',sans-serif !important;
+  color: var(--ecm-white) !important;
+}
+
+/* الحقول */
+.wc-block-components-text-input input,
+.wc-block-components-text-input input.input-text,
+.wc-block-components-select select,
+.wc-block-components-quantity-selector input {
+  background: var(--ecm-bg-card) !important;
+  border: 1px solid var(--ecm-border) !important;
+  color: var(--ecm-white) !important;
+  border-radius: var(--ecm-radius-sm) !important;
+}
+.wc-block-components-text-input input:focus { border-color: var(--ecm-green) !important; }
+.wc-block-components-text-input label,
+.wc-block-components-checkout-step__description { color: var(--ecm-grey-mid) !important; }
+
+/* صندوق الملخّص/الإجمالي */
+.wc-block-components-sidebar,
+.wp-block-woocommerce-checkout-order-summary-block,
+.wc-block-cart__sidebar .wc-block-components-totals-wrapper,
+.wc-block-cart__sidebar > .wc-block-components-panel,
+.wc-block-cart__sidebar {
+  background: var(--ecm-bg-card);
+  border: 1px solid var(--ecm-border);
+  border-radius: var(--ecm-radius-md);
+  padding: 20px;
+}
+.wc-block-components-totals-item__value,
+.wc-block-components-product-price,
+.wc-block-formatted-money-amount { color: var(--ecm-white); font-weight: 700; }
+.wc-block-components-totals-footer-item .wc-block-components-totals-item__value { color: var(--ecm-green); }
+
+/* الأزرار */
+.wc-block-components-button,
+.wp-block-woocommerce-cart .wc-block-cart__submit-button,
+.wc-block-components-button.contained {
+  background: var(--ecm-green) !important;
+  color: #0d0e11 !important;
+  font-family: 'Orbitron','Cairo',sans-serif !important;
+  font-weight: 700 !important;
+  border-radius: var(--ecm-radius-sm) !important;
+  border: none !important;
+  transition: transform 0.2s ease, box-shadow 0.25s ease !important;
+}
+.wc-block-components-button:hover { transform: translateY(-2px); box-shadow: var(--ecm-shadow-green) !important; }
+
+/* جدول عناصر السلة */
+.wc-block-cart-items,
+.wc-block-cart-items__row { border-color: var(--ecm-border) !important; }
+.wc-block-cart-item__image img { border-radius: var(--ecm-radius-sm); border: 1px solid var(--ecm-border); }
+.wc-block-components-product-name { color: var(--ecm-white) !important; }
+
+/* الروابط والرسائل */
+.wc-block-components-notice-banner {
+  background: var(--ecm-bg-card) !important;
+  border-radius: var(--ecm-radius-sm);
+}
+.wp-block-woocommerce-checkout a,
+.wp-block-woocommerce-cart a { color: var(--ecm-green); }
+
+
+/* ════════════════════════════════════════════════════════════
+   تقوية إضافية لصفحة المنتج (احترافية أعلى)
+   ════════════════════════════════════════════════════════════ */
+/* أزرار الكمية +/- لو ظاهرة */
+.woocommerce .quantity { display: inline-flex; align-items: center; }
+.woocommerce div.product form.cart .quantity input.qty {
+  height: 48px;
+  border-radius: var(--ecm-radius-sm) !important;
+}
+.woocommerce div.product .single_add_to_cart_button { height: 48px; }
+
+/* وصف قصير أوضح */
+.woocommerce div.product .woocommerce-product-details__short-description p { margin-bottom: 10px; }
+
+/* عنوان قسم التابات */
+.woocommerce-Tabs-panel h2 {
+  font-family: 'Orbitron','Cairo',sans-serif;
+  color: var(--ecm-white);
+}
+
+/* صورة المنتج المكبّرة (zoom) — حدود ناعمة */
+.woocommerce div.product .woocommerce-product-gallery__image a { display: block; }
+.woocommerce div.product .woocommerce-product-gallery__trigger {
+  background: rgba(13,14,17,0.6);
+  border: 1px solid var(--ecm-border);
+  border-radius: 50%;
+  top: 12px;
+  inset-inline-end: 12px;
+}
+
+/* المنتجات المشابهة: نفس كروت المتجر */
+.woocommerce div.product .related.products ul.products,
+.woocommerce div.product .upsells.products ul.products {
+  grid-template-columns: repeat(4, 1fr);
+}
+@media (max-width: 880px) {
+  .woocommerce div.product .related.products ul.products,
+  .woocommerce div.product .upsells.products ul.products { grid-template-columns: repeat(2, 1fr); }
 }
 
 

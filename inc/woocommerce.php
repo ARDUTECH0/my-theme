@@ -98,6 +98,14 @@ add_action( 'woocommerce_before_shop_loop_item_title', function () {
     }
 }, 9 );
 
+// ── شارة "منتج رقمي" فوق عنوان المنتج (للمنتجات القابلة للتحميل) ─
+add_action( 'woocommerce_single_product_summary', function () {
+    global $product;
+    if ( $product && $product->is_downloadable() ) {
+        echo '<span class="ecm-single-digital">⬇ ' . esc_html__( 'منتج رقمي', 'ecm-theme' ) . '</span>';
+    }
+}, 4 );
+
 // ── نص زر "أضف للسلة" أوضح للمنتجات الرقمية ───────────────────
 add_filter( 'woocommerce_product_single_add_to_cart_text', function ( $text, $product ) {
     if ( $product && $product->is_downloadable() ) {
