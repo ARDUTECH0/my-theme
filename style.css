@@ -4,7 +4,7 @@ Theme URI:   https://ecameraman.com
 Author:      E.Camera.Man
 Author URI:  https://ecameraman.com
 Description: ثيم احترافي لموقع ECM — E.Camera.Man مع دعم Elementor كامل
-Version:     3.0.22
+Version:     3.0.23
 License:     GNU General Public License v2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Text Domain: ecm-theme
@@ -4739,10 +4739,10 @@ body.admin-bar #ecm-header {
 .ecm-google-sub { color: var(--ecm-grey-mid); font-size: 13px; margin: 0 0 18px; }
 .ecm-g-btn {
   display: flex; justify-content: center;
-  transform: scale(1.12);
-  transform-origin: center;
-  margin: 6px 0;
+  margin: 8px 0 2px;
 }
+/* إطار خفيف حوالين زر جوجل لإحساس أكبر */
+.ecm-g-btn > div { border-radius: 50px; }
 .ecm-or-sep {
   display: flex; align-items: center; gap: 12px;
   margin: 22px auto 4px; max-width: 360px; color: var(--ecm-grey-mid); font-size: 13px;
@@ -5169,4 +5169,132 @@ body.admin-bar #ecm-header {
   margin-top: 0;
 }
 
+
+/* ════════════════════════════════════════════════════════════
+   صفحة المنتج — التصميم الاحترافي النهائي (له الأولوية)
+   ════════════════════════════════════════════════════════════ */
+.single-product .ecm-woo-inner,
+.single-product .ecm-woo-container { max-width: 1160px; margin-inline: auto; }
+
+/* تخطيط عمودين متوازن */
+.woocommerce div.product {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: 46px;
+  align-items: start;
+}
+
+/* ── المعرض ككارت أنيق ── */
+.woocommerce div.product .woocommerce-product-gallery {
+  width: 100% !important;
+  float: none !important;
+  margin: 0 !important;
+  opacity: 1 !important;
+}
+.woocommerce div.product .woocommerce-product-gallery__wrapper {
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: none !important;
+  margin: 0 !important;
+  border: 1px solid var(--ecm-border);
+  border-radius: 18px;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 25%, #1c1f25, #121317);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1 / 1;
+}
+.woocommerce div.product .woocommerce-product-gallery__image,
+.woocommerce div.product .woocommerce-product-gallery__image a { width: 100%; height: 100%; display: block; }
+.woocommerce div.product .woocommerce-product-gallery img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  padding: 20px;
+}
+.woocommerce div.product .woocommerce-product-gallery .flex-control-thumbs {
+  display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 0; padding: 0;
+  aspect-ratio: auto;
+}
+.woocommerce div.product .woocommerce-product-gallery .flex-control-thumbs li { width: 70px !important; margin: 0 !important; }
+.woocommerce div.product .woocommerce-product-gallery__trigger {
+  background: rgba(13,14,17,0.7);
+  border: 1px solid var(--ecm-border);
+  border-radius: 50%;
+  top: 14px; inset-inline-end: 14px; z-index: 5;
+}
+
+/* ── كارت الملخّص ── */
+.woocommerce div.product .summary.entry-summary {
+  margin: 0 !important;
+  width: auto !important;
+  float: none !important;
+  background: linear-gradient(165deg, var(--ecm-bg-card), #14161a);
+  border: 1px solid var(--ecm-border);
+  border-radius: 18px;
+  padding: 34px;
+  position: sticky;
+  top: 100px;
+  box-shadow: 0 18px 50px rgba(0,0,0,0.32);
+}
+.woocommerce div.product .summary .product_title {
+  font-family: 'Orbitron','Cairo',sans-serif;
+  font-weight: 800;
+  font-size: clamp(24px, 3vw, 34px);
+  line-height: 1.25;
+  margin: 8px 0 16px;
+  color: var(--ecm-white);
+}
+.woocommerce div.product .summary p.price,
+.woocommerce div.product .summary span.price {
+  display: block;
+  font-size: 30px;
+  font-weight: 800;
+  color: var(--ecm-green);
+  padding-bottom: 20px;
+  margin-bottom: 22px;
+  border-bottom: 1px solid var(--ecm-border);
+}
+.woocommerce div.product .summary p.price del { font-size: 18px; opacity: 0.55; }
+.woocommerce div.product .summary p.price ins { text-decoration: none; }
+.woocommerce div.product .summary .woocommerce-product-details__short-description {
+  color: var(--ecm-grey-light); line-height: 1.9; margin-bottom: 6px;
+}
+
+/* منطقة الكمية + الشراء */
+.woocommerce div.product form.cart {
+  display: flex; align-items: stretch; gap: 12px; flex-wrap: wrap;
+  margin: 26px 0 6px;
+}
+.woocommerce div.product form.cart .quantity { display: flex; }
+.woocommerce div.product form.cart .quantity input.qty {
+  width: 84px; height: 54px; text-align: center; font-weight: 700;
+  background: #0f1115 !important; border: 1px solid var(--ecm-border) !important;
+  color: var(--ecm-white) !important; border-radius: var(--ecm-radius-sm) !important;
+}
+.woocommerce div.product form.cart .single_add_to_cart_button {
+  flex: 1; min-width: 220px; height: 54px;
+  font-size: 15px !important; letter-spacing: 0.5px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.woocommerce div.product .summary .product_meta {
+  margin-top: 24px; padding-top: 18px;
+  border-top: 1px solid var(--ecm-border);
+  font-size: 13px; color: var(--ecm-grey-mid);
+}
+.woocommerce div.product .summary .product_meta > span { display: block; margin-bottom: 4px; }
+.woocommerce div.product .summary .product_meta a { color: var(--ecm-green); }
+
+/* التابات والمشابهة بعرض كامل */
+.woocommerce div.product .woocommerce-tabs,
+.woocommerce div.product .related.products,
+.woocommerce div.product .upsells.products { grid-column: 1 / -1; margin-top: 26px; }
+
+/* متجاوب */
+@media (max-width: 860px) {
+  .woocommerce div.product { grid-template-columns: 1fr; gap: 26px; }
+  .woocommerce div.product .summary.entry-summary,
+  .woocommerce div.product .woocommerce-product-gallery { position: static; }
+}
 
