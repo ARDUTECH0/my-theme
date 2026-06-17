@@ -158,6 +158,11 @@ function ecm_google_login_handler() {
         $user = get_user_by( 'id', $uid );
     }
 
+    // خزّن صورة جوجل (تتعرض كأفاتار لو المستخدم مرفعش صورة خاصة)
+    if ( ! empty( $data['picture'] ) ) {
+        update_user_meta( $user->ID, 'ecm_google_avatar', esc_url_raw( $data['picture'] ) );
+    }
+
     // تسجيل الدخول
     wp_set_current_user( $user->ID );
     wp_set_auth_cookie( $user->ID, true );

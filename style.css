@@ -4,7 +4,7 @@ Theme URI:   https://ecameraman.com
 Author:      E.Camera.Man
 Author URI:  https://ecameraman.com
 Description: ثيم احترافي لموقع ECM — E.Camera.Man مع دعم Elementor كامل
-Version:     3.0.24
+Version:     3.0.25
 License:     GNU General Public License v2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Text Domain: ecm-theme
@@ -4417,12 +4417,14 @@ body.admin-bar #ecm-header {
 /* ════════════════════════════════════════════════════════════
    WOOCOMMERCE — متجر ECM (منتجات رقمية) بستايل البراند
    ════════════════════════════════════════════════════════════ */
-.ecm-woo { width: 100%; }
+.ecm-woo {
+  width: 100%;
+  padding: calc(var(--ecm-nav-height) + 32px) 20px 80px; /* عشان ما يدخلش تحت النفبار */
+}
 .ecm-woo-inner,
 .ecm-woo-container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 40px 20px 80px;
 }
 .woocommerce-products-header__title,
 .ecm-woo .entry-title,
@@ -4759,6 +4761,33 @@ body.admin-bar #ecm-header {
   object-fit: cover;
 }
 .ecm-woo-account > a { gap: 8px; }
+
+/* ── حقل رفع صورة الحساب ── */
+.ecm-avatar-field {
+  border: 1px solid var(--ecm-border);
+  border-radius: var(--ecm-radius-md);
+  background: var(--ecm-bg-card);
+  padding: 20px 22px;
+  margin-bottom: 24px;
+}
+.ecm-avatar-field legend {
+  font-family: 'Orbitron','Cairo',sans-serif;
+  color: var(--ecm-white);
+  font-weight: 700;
+  padding: 0 6px;
+}
+.ecm-avatar-row { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.ecm-avatar-preview {
+  width: 84px; height: 84px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--ecm-green);
+  box-shadow: 0 0 16px var(--ecm-green-glow);
+}
+.ecm-avatar-actions { display: flex; flex-direction: column; gap: 6px; }
+.ecm-avatar-btn { cursor: pointer; align-self: flex-start; }
+.ecm-avatar-hint { color: var(--ecm-grey-mid); font-size: 12px; margin: 0; }
+.ecm-avatar-remove { color: var(--ecm-grey-mid); font-size: 13px; display: flex; align-items: center; gap: 6px; }
 
 /* ── ترقيم الصفحات ── */
 .woocommerce nav.woocommerce-pagination ul { border: none; gap: 6px; display: flex; justify-content: center; }
@@ -5296,5 +5325,47 @@ body.admin-bar #ecm-header {
   .woocommerce div.product { grid-template-columns: 1fr; gap: 26px; }
   .woocommerce div.product .summary.entry-summary,
   .woocommerce div.product .woocommerce-product-gallery { position: static; }
+}
+
+/* ── محتوى الوصف (Description) بشكل احترافي + صور ── */
+.woocommerce div.product .woocommerce-tabs .panel {
+  background: linear-gradient(165deg, var(--ecm-bg-card), #14161a);
+  border: 1px solid var(--ecm-border);
+  border-radius: 16px;
+  padding: 32px clamp(20px, 4vw, 44px);
+  color: var(--ecm-grey-light);
+  line-height: 1.95;
+  font-size: 15.5px;
+}
+.woocommerce div.product .woocommerce-tabs .panel > h2:first-child {
+  font-family: 'Orbitron','Cairo',sans-serif;
+  color: var(--ecm-white);
+  font-weight: 800;
+  margin: 0 0 18px;
+}
+.woocommerce div.product .woocommerce-tabs .panel h2,
+.woocommerce div.product .woocommerce-tabs .panel h3,
+.woocommerce div.product .woocommerce-tabs .panel h4 {
+  font-family: 'Orbitron','Cairo',sans-serif;
+  color: var(--ecm-white);
+  margin: 22px 0 12px;
+}
+.woocommerce div.product .woocommerce-tabs .panel p { margin: 0 0 14px; }
+.woocommerce div.product .woocommerce-tabs .panel img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--ecm-radius-md);
+  border: 1px solid var(--ecm-border);
+  margin: 10px 0;
+  display: block;
+}
+.woocommerce div.product .woocommerce-tabs .panel ul,
+.woocommerce div.product .woocommerce-tabs .panel ol { margin: 0 0 16px; padding-inline-start: 22px; }
+.woocommerce div.product .woocommerce-tabs .panel ul li { margin-bottom: 8px; }
+.woocommerce div.product .woocommerce-tabs .panel ul li::marker { color: var(--ecm-green); }
+.woocommerce div.product .woocommerce-tabs .panel a { color: var(--ecm-green); }
+.woocommerce div.product .woocommerce-tabs .panel table td,
+.woocommerce div.product .woocommerce-tabs .panel table th {
+  border-color: var(--ecm-border); color: var(--ecm-grey-light); padding: 10px 14px;
 }
 

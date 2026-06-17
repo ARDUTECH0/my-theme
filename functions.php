@@ -376,7 +376,7 @@ add_action( 'wp_enqueue_scripts', 'ecm_enqueue_assets' );
 
 
 // ── THEME VERSION CONSTANT ───────────────────────────────────
-define( 'ECM_VERSION', '3.0.24' );
+define( 'ECM_VERSION', '3.0.25' );
 
 
 // ── INCLUDE: FRONT PAGE CUSTOMIZER ──────────────────────────
@@ -428,6 +428,9 @@ require_once get_template_directory() . '/inc/woocommerce.php';
 
 // ── INCLUDE: تسجيل الدخول بحساب Google ───────────────────────
 require_once get_template_directory() . '/inc/google-login.php';
+
+// ── INCLUDE: صورة المستخدم (أفاتار جوجل/مرفوع) ───────────────
+require_once get_template_directory() . '/inc/user-avatar.php';
 
 
 // ── ELEMENTOR PRO — THEME BUILDER LOCATIONS ──────────────────
