@@ -594,9 +594,57 @@ add_shortcode( 'ecm_device_activation', function () {
 
     echo '<form method="post" class="ecm-activate-form">';
     wp_nonce_field( 'ecm_activate', 'ecm_activate_nonce' );
-    echo '<input type="text" name="ecm_activate_serial" placeholder="' . esc_attr__( 'مثال: ECM-0001', 'ecm-theme' ) . '" required>';
+    echo '<input type="text" name="ecm_activate_serial" id="ecm-activate-serial" placeholder="' . esc_attr__( 'مثال: ECM-0001', 'ecm-theme' ) . '" required>';
+    echo '<button type="button" id="ecm-scan-btn" class="ecm-scan-btn" title="' . esc_attr__( 'امسح الباركود بالكاميرا', 'ecm-theme' ) . '">📷</button>';
     echo '<button type="submit" class="ecm-btn-primary">' . esc_html__( 'تفعيل', 'ecm-theme' ) . '</button>';
     echo '</form>';
+
+    // ── ماسح الباركود/الـ QR بالكاميرا ──
+    echo '<div id="ecm-scanner" class="ecm-scanner" hidden>';
+    echo '<div id="ecm-scanner-view"></div>';
+    echo '<button type="button" id="ecm-scan-close" class="ecm-scan-close">' . esc_html__( 'إغلاق الكاميرا ✕', 'ecm-theme' ) . '</button>';
+    echo '</div>';
+    ?>
+    <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script>
+    ( function () {
+        var btn   = document.getElementById( 'ecm-scan-btn' );
+        var close = document.getElementById( 'ecm-scan-close' );
+        var box   = document.getElementById( 'ecm-scanner' );
+        var input = document.getElementById( 'ecm-activate-serial' );
+        var scanner = null;
+        if ( ! btn ) { return; }
+
+        function extractSerial( text ) {
+            try { var u = new URL( text ); var s = u.searchParams.get( 'serial' ); if ( s ) { return s; } } catch ( e ) {}
+            return text;
+        }
+        function stop() {
+            if ( scanner ) { scanner.stop().then( function () { scanner.clear(); } ).catch( function () {} ); scanner = null; }
+            box.hidden = true;
+        }
+        btn.addEventListener( 'click', function () {
+            if ( ! window.Html5Qrcode ) { alert( 'الماسح مش جاهز — حدّث الصفحة وحاول تاني' ); return; }
+            box.hidden = false;
+            scanner = new Html5Qrcode( 'ecm-scanner-view' );
+            scanner.start(
+                { facingMode: 'environment' },
+                { fps: 10, qrbox: 240 },
+                function ( decoded ) {
+                    input.value = ( extractSerial( decoded ) || '' ).toString().trim().toUpperCase();
+                    stop();
+                    input.focus();
+                },
+                function () {}
+            ).catch( function ( e ) {
+                box.hidden = true;
+                alert( 'تعذّر فتح الكاميرا. تأكد إن الموقع HTTPS وإنك سمحت بالكاميرا.' );
+            } );
+        } );
+        close.addEventListener( 'click', stop );
+    } )();
+    </script>
+    <?php
 
     if ( $msg ) {
         echo '<div class="ecm-activate-msg is-' . esc_attr( $type ) . '">' . esc_html( $msg ) . '</div>';
