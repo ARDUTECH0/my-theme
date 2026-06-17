@@ -20,7 +20,7 @@ function ecm_serial_table(): string {
 
 // ── إنشاء/تحديث الجدول ────────────────────────────────────────
 function ecm_serials_install() {
-    if ( get_option( 'ecm_serials_db_v2' ) ) {
+    if ( get_option( 'ecm_serials_db_v3' ) ) {
         return;
     }
     global $wpdb;
@@ -36,6 +36,7 @@ function ecm_serials_install() {
         email VARCHAR(190) NOT NULL DEFAULT '',
         token VARCHAR(64) NOT NULL DEFAULT '',
         warranty_months INT NOT NULL DEFAULT 12,
+        free_all TINYINT(1) NOT NULL DEFAULT 0,
         activated_at DATETIME NULL,
         created_at DATETIME NOT NULL,
         PRIMARY KEY  (id),
@@ -43,7 +44,7 @@ function ecm_serials_install() {
         KEY token (token)
     ) {$charset};" );
 
-    update_option( 'ecm_serials_db_v2', 1 );
+    update_option( 'ecm_serials_db_v3', 1 );
     // نحتاج flush للـ endpoint بتاع "أجهزتي"
     update_option( 'ecm_serials_flush', 1 );
 }
@@ -178,7 +179,65 @@ add_action( 'admin_menu', function () {
         'dashicons-shield',
         58
     );
+    add_submenu_page( 'ecm-serials', __( 'الأجهزة', 'ecm-theme' ), __( '📋 الأجهزة', 'ecm-theme' ), 'manage_options', 'ecm-serials', 'ecm_serials_admin_page' );
+    add_submenu_page( 'ecm-serials', __( 'API والتوكن', 'ecm-theme' ), __( '🔌 API والتوكن', 'ecm-theme' ), 'manage_options', 'ecm-serials-api', 'ecm_serials_api_page' );
 } );
+
+/** صفحة الـ API والتوكن */
+function ecm_serials_api_page() {
+    if ( ! current_user_can( 'manage_options' ) ) {
+        return;
+    }
+    if ( isset( $_POST['ecm_regen_token'] ) && check_admin_referer( 'ecm_serials_api' ) ) {
+        update_option( 'ecm_api_token', wp_generate_password( 48, false ) );
+        echo '<div class="notice notice-success"><p>' . esc_html__( 'تم توليد توكن API جديد.', 'ecm-theme' ) . '</p></div>';
+    }
+    $api_token = ecm_get_api_token();
+    $api_base  = rest_url( 'ecm/v1' );
+    ?>
+    <style>
+        .ecm-sp { max-width: 980px; }
+        .ecm-sp-box { background:#fff; border:1px solid #e2e4e7; border-radius:12px; padding:22px 24px; margin:18px 0; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+        .ecm-sp-token { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+        .ecm-sp-token code { background:#1d2327; color:#7CFF6B; padding:10px 14px; border-radius:8px; font-size:13px; word-break:break-all; flex:1; min-width:280px; }
+        .ecm-sp-endpoints code { display:block; background:#f6f7f7; border:1px solid #e2e4e7; border-radius:6px; padding:8px 12px; margin:6px 0; font-size:12.5px; color:#1d2327; }
+        .ecm-sp-endpoints h3 { margin:18px 0 6px; }
+    </style>
+    <div class="wrap ecm-sp">
+        <h1>🔌 <?php esc_html_e( 'API والتوكن', 'ecm-theme' ); ?></h1>
+
+        <div class="ecm-sp-box">
+            <h2><?php esc_html_e( 'مفتاح الـ API', 'ecm-theme' ); ?></h2>
+            <p><?php esc_html_e( 'استخدمه في تطبيقك عبر الهيدر X-ECM-Token أو ?api_key= في الرابط.', 'ecm-theme' ); ?></p>
+            <div class="ecm-sp-token">
+                <code id="ecm-api-token"><?php echo esc_html( $api_token ); ?></code>
+                <button type="button" class="button" onclick="navigator.clipboard.writeText(document.getElementById('ecm-api-token').textContent);this.textContent='✓ تم النسخ';"><?php esc_html_e( 'نسخ', 'ecm-theme' ); ?></button>
+                <form method="post" style="display:inline;" onsubmit="return confirm('توليد توكن جديد هيوقف القديم. متأكد؟');">
+                    <?php wp_nonce_field( 'ecm_serials_api' ); ?>
+                    <button class="button" name="ecm_regen_token" value="1"><?php esc_html_e( 'توليد توكن جديد', 'ecm-theme' ); ?></button>
+                </form>
+            </div>
+        </div>
+
+        <div class="ecm-sp-box ecm-sp-endpoints">
+            <h2><?php esc_html_e( 'نقاط النهاية', 'ecm-theme' ); ?></h2>
+
+            <h3><?php esc_html_e( 'قائمة الأجهزة (مع فلاتر)', 'ecm-theme' ); ?></h3>
+            <code>GET <?php echo esc_html( $api_base ); ?>/devices?api_key=<?php echo esc_html( substr( $api_token, 0, 8 ) ); ?>…</code>
+            <code>&amp;status=activated | available</code>
+            <code>&amp;warranty=valid | expired</code>
+            <code>&amp;expiring=30   (ضمانه يخلص خلال 30 يوم)</code>
+            <code>&amp;search=ECM-0001 &amp; limit=50 &amp; offset=0</code>
+
+            <h3><?php esc_html_e( 'الإحصائيات', 'ecm-theme' ); ?></h3>
+            <code>GET <?php echo esc_html( $api_base ); ?>/stats?api_key=TOKEN</code>
+
+            <h3><?php esc_html_e( 'التحقق (عام — للتطبيق وقت الاستخدام)', 'ecm-theme' ); ?></h3>
+            <code>GET <?php echo esc_html( $api_base ); ?>/verify?serial=ECM-0001&amp;email=USER</code>
+        </div>
+    </div>
+    <?php
+}
 
 function ecm_serials_admin_page() {
     if ( ! current_user_can( 'manage_options' ) ) {
@@ -200,10 +259,16 @@ function ecm_serials_admin_page() {
         echo '<div class="notice notice-success"><p>' . sprintf( esc_html__( 'تم إضافة %1$d سيريال بضمان %2$d شهر.', 'ecm-theme' ), (int) $added, (int) $warranty ) . '</p></div>';
     }
 
-    // تعديل مدة الضمان لجهاز
+    // تعديل مدة الضمان لجهاز (ممنوع بعد التفعيل)
     if ( isset( $_POST['ecm_set_warranty'], $_POST['ecm_sid'] ) && check_admin_referer( 'ecm_serials' ) ) {
-        $wpdb->update( $table, [ 'warranty_months' => max( 0, (int) $_POST['ecm_warranty_val'] ) ], [ 'id' => (int) $_POST['ecm_sid'] ] );
-        echo '<div class="notice notice-success"><p>' . esc_html__( 'تم تحديث مدة الضمان.', 'ecm-theme' ) . '</p></div>';
+        $sid     = (int) $_POST['ecm_sid'];
+        $is_act  = (int) $wpdb->get_var( $wpdb->prepare( "SELECT user_id FROM {$table} WHERE id = %d", $sid ) );
+        if ( $is_act > 0 ) {
+            echo '<div class="notice notice-error"><p>' . esc_html__( 'الجهاز مفعّل — مايصحّش تغيير مدة الضمان بعد التفعيل.', 'ecm-theme' ) . '</p></div>';
+        } else {
+            $wpdb->update( $table, [ 'warranty_months' => max( 0, (int) $_POST['ecm_warranty_val'] ) ], [ 'id' => $sid ] );
+            echo '<div class="notice notice-success"><p>' . esc_html__( 'تم تحديث مدة الضمان.', 'ecm-theme' ) . '</p></div>';
+        }
     }
 
     // فك ربط
@@ -212,10 +277,11 @@ function ecm_serials_admin_page() {
         echo '<div class="notice notice-success"><p>' . esc_html__( 'تم فك ربط الجهاز.', 'ecm-theme' ) . '</p></div>';
     }
 
-    // توليد توكن API جديد
-    if ( isset( $_POST['ecm_regen_token'] ) && check_admin_referer( 'ecm_serials' ) ) {
-        update_option( 'ecm_api_token', wp_generate_password( 48, false ) );
-        echo '<div class="notice notice-success"><p>' . esc_html__( 'تم توليد توكن API جديد.', 'ecm-theme' ) . '</p></div>';
+    // تبديل «كل المنتجات مجانًا» لجهاز
+    if ( isset( $_POST['ecm_toggle_free'], $_POST['ecm_sid'] ) && check_admin_referer( 'ecm_serials' ) ) {
+        $val = empty( $_POST['ecm_free_val'] ) ? 0 : 1;
+        $wpdb->update( $table, [ 'free_all' => $val ], [ 'id' => (int) $_POST['ecm_sid'] ] );
+        echo '<div class="notice notice-success"><p>' . esc_html__( 'تم تحديث صلاحية «كل المنتجات مجانًا».', 'ecm-theme' ) . '</p></div>';
     }
 
     $rows     = $wpdb->get_results( "SELECT * FROM {$table} ORDER BY id DESC LIMIT 200" );
@@ -223,8 +289,6 @@ function ecm_serials_admin_page() {
     $bound    = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE user_id > 0" );
     $avail    = $total - $bound;
     $expiring = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE user_id > 0 AND activated_at IS NOT NULL AND DATE_ADD(activated_at, INTERVAL warranty_months MONTH) BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 30 DAY)" );
-    $api_token = ecm_get_api_token();
-    $api_base  = rest_url( 'ecm/v1' );
     ?>
     <style>
         .ecm-sp { max-width: 1100px; }
@@ -257,25 +321,7 @@ function ecm_serials_admin_page() {
             <div class="ecm-sp-card orange"><div class="n"><?php echo (int) $expiring; ?></div><div class="l"><?php esc_html_e( 'ضمانها يقرب يخلص (30 يوم)', 'ecm-theme' ); ?></div></div>
         </div>
 
-        <div class="ecm-sp-box">
-            <h2>🔌 <?php esc_html_e( 'الـ API والتوكن', 'ecm-theme' ); ?></h2>
-            <p><?php esc_html_e( 'استخدم التوكن ده في تطبيقك للوصول لبيانات الأجهزة (في الهيدر X-ECM-Token أو ?api_key=).', 'ecm-theme' ); ?></p>
-            <div class="ecm-sp-token">
-                <code id="ecm-api-token"><?php echo esc_html( $api_token ); ?></code>
-                <button type="button" class="button" onclick="navigator.clipboard.writeText(document.getElementById('ecm-api-token').textContent);this.textContent='✓ تم النسخ';"><?php esc_html_e( 'نسخ', 'ecm-theme' ); ?></button>
-                <form method="post" style="display:inline;" onsubmit="return confirm('توليد توكن جديد هيوقف القديم. متأكد؟');">
-                    <?php wp_nonce_field( 'ecm_serials' ); ?>
-                    <button class="button" name="ecm_regen_token" value="1"><?php esc_html_e( 'توليد جديد', 'ecm-theme' ); ?></button>
-                </form>
-            </div>
-            <div class="ecm-sp-endpoints">
-                <strong><?php esc_html_e( 'نقاط النهاية:', 'ecm-theme' ); ?></strong>
-                <code>GET <?php echo esc_html( $api_base ); ?>/devices?api_key=TOKEN</code>
-                <code>GET <?php echo esc_html( $api_base ); ?>/devices?status=activated&amp;warranty=valid&amp;search=ECM&amp;limit=50&amp;offset=0</code>
-                <code>GET <?php echo esc_html( $api_base ); ?>/stats?api_key=TOKEN</code>
-                <code>GET <?php echo esc_html( $api_base ); ?>/verify?serial=ECM-0001&amp;email=USER (عام — للتطبيق)</code>
-            </div>
-        </div>
+        <p><a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=ecm-serials-api' ) ); ?>">🔌 <?php esc_html_e( 'صفحة الـ API والتوكن', 'ecm-theme' ); ?></a></p>
 
         <div class="ecm-sp-box">
             <h2>➕ <?php esc_html_e( 'إضافة سيريالات أصلية', 'ecm-theme' ); ?></h2>
@@ -302,6 +348,7 @@ function ecm_serials_admin_page() {
                 <th><?php esc_html_e( 'تاريخ التفعيل', 'ecm-theme' ); ?></th>
                 <th><?php esc_html_e( 'متبقّي للضمان', 'ecm-theme' ); ?></th>
                 <th><?php esc_html_e( 'الضمان (شهور)', 'ecm-theme' ); ?></th>
+                <th><?php esc_html_e( 'كل المنتجات مجانًا', 'ecm-theme' ); ?></th>
                 <th></th>
             </tr></thead>
             <tbody>
@@ -324,11 +371,25 @@ function ecm_serials_admin_page() {
                         }
                     ?></td>
                     <td>
+                        <?php if ( $r->user_id ) : // مفعّل = الضمان مقفول ?>
+                            <strong><?php echo (int) ( $r->warranty_months ?? 12 ); ?></strong> 🔒
+                        <?php else : ?>
                         <form method="post" style="display:flex;gap:4px;align-items:center;">
                             <?php wp_nonce_field( 'ecm_serials' ); ?>
                             <input type="hidden" name="ecm_sid" value="<?php echo (int) $r->id; ?>">
                             <input type="number" name="ecm_warranty_val" value="<?php echo (int) ( $r->warranty_months ?? 12 ); ?>" min="0" max="120" style="width:70px;">
                             <button class="button button-small" name="ecm_set_warranty" value="1"><?php esc_html_e( 'حفظ', 'ecm-theme' ); ?></button>
+                        </form>
+                        <?php endif; ?>
+                    </td>
+                    <td>
+                        <form method="post" style="display:flex;gap:4px;align-items:center;">
+                            <?php wp_nonce_field( 'ecm_serials' ); ?>
+                            <input type="hidden" name="ecm_sid" value="<?php echo (int) $r->id; ?>">
+                            <input type="hidden" name="ecm_free_val" value="<?php echo $r->free_all ? '0' : '1'; ?>">
+                            <button class="button button-small" name="ecm_toggle_free" value="1" style="<?php echo $r->free_all ? 'background:#1a7f37;color:#fff;border-color:#1a7f37;' : ''; ?>">
+                                <?php echo $r->free_all ? '✅ ' . esc_html__( 'مفعّل', 'ecm-theme' ) : esc_html__( 'تفعيل', 'ecm-theme' ); ?>
+                            </button>
                         </form>
                     </td>
                     <td><?php if ( $r->user_id ) : ?>
@@ -336,7 +397,7 @@ function ecm_serials_admin_page() {
                     <?php endif; ?></td>
                 </tr>
             <?php endforeach; else : ?>
-                <tr><td colspan="7"><?php esc_html_e( 'لا يوجد سيريالات بعد.', 'ecm-theme' ); ?></td></tr>
+                <tr><td colspan="8"><?php esc_html_e( 'لا يوجد سيريالات بعد.', 'ecm-theme' ); ?></td></tr>
             <?php endif; ?>
             </tbody>
         </table>
@@ -813,6 +874,46 @@ add_action( 'woocommerce_before_main_content', function () {
 
 
 // ════════════════════════════════════════════════════════════
+// §  صلاحية «كل المنتجات مجانًا» لجهاز معيّن
+// ════════════════════════════════════════════════════════════
+
+/** هل المستخدم عنده جهاز بصلاحية "كل المنتجات مجانًا"؟ */
+function ecm_user_has_free_access( int $user_id ): bool {
+    if ( ! $user_id ) {
+        return false;
+    }
+    global $wpdb;
+    return (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . ecm_serial_table() . ' WHERE user_id = %d AND free_all = 1', $user_id ) ) > 0;
+}
+
+/** تصفير أسعار السلة للمستخدم اللي عنده صلاحية مجاني */
+add_action( 'woocommerce_before_calculate_totals', function ( $cart ) {
+    if ( is_admin() && ! wp_doing_ajax() ) {
+        return;
+    }
+    if ( ! is_user_logged_in() || ! ecm_user_has_free_access( get_current_user_id() ) ) {
+        return;
+    }
+    foreach ( $cart->get_cart() as $item ) {
+        if ( isset( $item['data'] ) && is_object( $item['data'] ) ) {
+            $item['data']->set_price( 0 );
+        }
+    }
+}, 20 );
+
+/** بانر أخضر: كل المنتجات مجانية لحسابك */
+add_action( 'woocommerce_before_main_content', function () {
+    if ( ! is_user_logged_in() || ! ecm_user_has_free_access( get_current_user_id() ) ) {
+        return;
+    }
+    if ( ! ( is_shop() || is_product() || is_product_category() || is_cart() || is_checkout() ) ) {
+        return;
+    }
+    echo '<div class="ecm-free-banner">🎁 ' . esc_html__( 'مبروك! كل المنتجات مجانية لحسابك — أضفها للسلة وأكمل الطلب ببلاش.', 'ecm-theme' ) . '</div>';
+}, 6 );
+
+
+// ════════════════════════════════════════════════════════════
 // §  API — عرض الأجهزة + إحصائيات (بتوكن أو صلاحية أدمن)
 // ════════════════════════════════════════════════════════════
 add_action( 'rest_api_init', function () {
@@ -891,6 +992,7 @@ function ecm_rest_list_devices( $request ) {
             'warranty_until'   => $warr_end ? date_i18n( 'Y-m-d', $warr_end ) : '',
             'warranty_valid'   => $valid,
             'warranty_left'    => ( $valid && $warr_end ) ? ecm_secs_to_ar( $warr_end - current_time( 'timestamp' ) ) : '',
+            'free_all'         => ( (int) $r->free_all === 1 ),
         ];
     }
 
