@@ -4,7 +4,7 @@ Theme URI:   https://ecameraman.com
 Author:      E.Camera.Man
 Author URI:  https://ecameraman.com
 Description: ثيم احترافي لموقع ECM — E.Camera.Man مع دعم Elementor كامل
-Version:     3.0.13
+Version:     3.0.14
 License:     GNU General Public License v2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Text Domain: ecm-theme
@@ -1422,10 +1422,18 @@ html { direction: rtl; }
   padding: 20px;
 }
 
-/* الإطار القابل للضغط (صورة) */
-.ecm-cgrid__stage--zoom { cursor: zoom-in; }
-.ecm-cgrid__stage--zoom .ecm-cgrid__img { transition: transform 0.3s ease; }
-.ecm-cgrid__stage--zoom:hover .ecm-cgrid__img { transform: scale(1.04); }
+/* تبديل الصورة عند المرور */
+.ecm-cgrid__img--hover {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+}
+.ecm-cgrid__stage--swap:hover .ecm-cgrid__img--hover { opacity: 1; }
 
 /* الأسهم */
 .ecm-cgrid__arrow {

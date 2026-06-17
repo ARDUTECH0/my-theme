@@ -75,10 +75,11 @@ class ECM_Widget_Control_Grid extends \Elementor\Widget_Base {
             'condition' => [ 'media_type' => 'image' ],
         ] );
 
-        $rep->add_control( 'popup_image', [
-            'label'       => __( 'صورة التكبير (تفتح عند الضغط)', 'ecm-theme' ),
+        $rep->add_control( 'hover_image', [
+            'label'       => __( 'صورة عند المرور (اختياري)', 'ecm-theme' ),
             'type'        => \Elementor\Controls_Manager::MEDIA,
-            'description' => __( 'تظهر مكبّرة لما الزائر يضغط على الخلية. سيبها فاضية = يستخدم نفس صورة الخلية.', 'ecm-theme' ),
+            'description' => __( 'لما الزائر يقف على الصورة تتبدّل للصورة دي. سيبها فاضية = الصورة ما تتغيّرش.', 'ecm-theme' ),
+            'condition'   => [ 'media_type' => 'image' ],
         ] );
 
         $rep->add_control( 'arrow', [
@@ -171,13 +172,6 @@ class ECM_Widget_Control_Grid extends \Elementor\Widget_Base {
             'default'      => '',
         ] );
 
-        $this->add_control( 'lightbox', [
-            'label'        => __( 'تكبير الصورة عند الضغط', 'ecm-theme' ),
-            'type'         => \Elementor\Controls_Manager::SWITCHER,
-            'return_value' => 'yes',
-            'default'      => 'yes',
-            'description'  => __( 'الضغط على الخلية يفتح الصورة مكبّرة في نافذة.', 'ecm-theme' ),
-        ] );
 
         $this->add_control( 'model_fill', [
             'label'       => __( 'حجم الموديل (ملء الإطار %)', 'ecm-theme' ),
@@ -282,33 +276,29 @@ class ECM_Widget_Control_Grid extends \Elementor\Widget_Base {
         if ( 'card' === $style ) { $cell_cls .= ' ecm-cgrid__cell--card'; }
         if ( 'glow' === $style ) { $cell_cls .= ' ecm-cgrid__cell--card ecm-cgrid__cell--glow'; }
 
-        $lightbox = ( 'yes' === ( $s['lightbox'] ?? 'yes' ) );
-
         echo '<div class="ecm-cgrid">';
 
         foreach ( $cells as $cell ) {
-            $type    = $cell['media_type'] ?? '3d';
-            $is_img  = ( 'image' === $type );
-            $img_url = ! empty( $cell['image']['url'] ) ? $cell['image']['url'] : '';
-            $glb     = ! empty( $cell['glb_url'] ) ? trim( $cell['glb_url'] ) : $shared;
-            $dir     = $cell['arrow'] ?? 'none';
-
-            // صورة التكبير: المخصّصة أو صورة الخلية
-            $popup = ! empty( $cell['popup_image']['url'] ) ? $cell['popup_image']['url'] : $img_url;
-            $can_zoom = ( $lightbox && '' !== $popup );
+            $type      = $cell['media_type'] ?? '3d';
+            $is_img    = ( 'image' === $type );
+            $img_url   = ! empty( $cell['image']['url'] ) ? $cell['image']['url'] : '';
+            $hover_url = ! empty( $cell['hover_image']['url'] ) ? $cell['hover_image']['url'] : '';
+            $glb       = ! empty( $cell['glb_url'] ) ? trim( $cell['glb_url'] ) : $shared;
+            $dir       = $cell['arrow'] ?? 'none';
 
             echo '<div class="' . esc_attr( $cell_cls ) . '">';
 
             // ── الإطار: المحتوى + السهم ──
-            // الصورة: الإطار كله قابل للضغط. الـ 3D: التكبير من الأيقونة بس (عشان السحب يفضل يلفّ).
-            $stage_clickable = ( $can_zoom && $is_img );
-            $stage_cls  = 'ecm-cgrid__stage' . ( $can_zoom ? ' ecm-cgrid__stage--zoom' : '' );
-            $stage_attr = $stage_clickable ? ' data-ecm-lb="' . esc_url( $popup ) . '" role="button" tabindex="0"' : '';
-            echo '<div class="' . esc_attr( $stage_cls ) . '"' . $stage_attr . '>';
+            $has_swap  = ( $is_img && '' !== $img_url && '' !== $hover_url );
+            $stage_cls = 'ecm-cgrid__stage' . ( $has_swap ? ' ecm-cgrid__stage--swap' : '' );
+            echo '<div class="' . esc_attr( $stage_cls ) . '">';
 
             if ( $is_img ) {
                 if ( '' !== $img_url ) {
                     echo '<img class="ecm-cgrid__img" src="' . esc_url( $img_url ) . '" alt="' . esc_attr( $cell['title'] ?? '' ) . '" loading="lazy">';
+                    if ( '' !== $hover_url ) {
+                        echo '<img class="ecm-cgrid__img ecm-cgrid__img--hover" src="' . esc_url( $hover_url ) . '" alt="" aria-hidden="true" loading="lazy">';
+                    }
                 } else {
                     echo '<div class="ecm-cgrid__empty">🖼️ ' . esc_html__( 'اختار صورة', 'ecm-theme' ) . '</div>';
                 }
