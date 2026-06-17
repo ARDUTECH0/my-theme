@@ -189,4 +189,40 @@
             }
         } );
     }
+
+    /* ── لايت‌بوكس بسيط لشبكة التحكّم 3D (تكبير الصور) ── */
+    var lbEl = null;
+    function ensureLightbox() {
+        if ( lbEl ) { return lbEl; }
+        lbEl = document.createElement( 'div' );
+        lbEl.className = 'ecm-lb';
+        lbEl.innerHTML = '<button type="button" class="ecm-lb__close" aria-label="إغلاق">&times;</button><img class="ecm-lb__img" alt="">';
+        document.body.appendChild( lbEl );
+        lbEl.addEventListener( 'click', function ( e ) {
+            if ( e.target === lbEl || e.target.classList.contains( 'ecm-lb__close' ) ) { closeLightbox(); }
+        } );
+        return lbEl;
+    }
+    function openLightbox( src ) {
+        if ( ! src ) { return; }
+        var el = ensureLightbox();
+        el.querySelector( '.ecm-lb__img' ).src = src;
+        el.classList.add( 'is-open' );
+        document.body.style.overflow = 'hidden';
+    }
+    function closeLightbox() {
+        if ( lbEl ) { lbEl.classList.remove( 'is-open' ); }
+        document.body.style.overflow = '';
+    }
+    document.addEventListener( 'click', function ( e ) {
+        var t = e.target.closest ? e.target.closest( '[data-ecm-lb]' ) : null;
+        if ( t ) { e.preventDefault(); openLightbox( t.getAttribute( 'data-ecm-lb' ) ); }
+    } );
+    document.addEventListener( 'keydown', function ( e ) {
+        if ( 'Escape' === e.key ) { closeLightbox(); return; }
+        if ( ( 'Enter' === e.key || ' ' === e.key ) && document.activeElement ) {
+            var t = document.activeElement.closest ? document.activeElement.closest( '[data-ecm-lb]' ) : null;
+            if ( t ) { e.preventDefault(); openLightbox( t.getAttribute( 'data-ecm-lb' ) ); }
+        }
+    } );
 })();

@@ -50,6 +50,37 @@ class ECM_Widget_Control_Grid extends \Elementor\Widget_Base {
 
         $rep = new \Elementor\Repeater();
 
+        $rep->add_control( 'media_type', [
+            'label'   => __( 'نوع المحتوى', 'ecm-theme' ),
+            'type'    => \Elementor\Controls_Manager::SELECT,
+            'default' => '3d',
+            'options' => [
+                '3d'    => __( 'موديل 3D', 'ecm-theme' ),
+                'image' => __( 'صورة', 'ecm-theme' ),
+            ],
+        ] );
+
+        $rep->add_control( 'glb_url', [
+            'label'       => __( 'ملف 3D خاص بالخلية (اختياري)', 'ecm-theme' ),
+            'type'        => \Elementor\Controls_Manager::TEXT,
+            'placeholder' => __( 'سيبه فاضي عشان يستخدم الملف المشترك', 'ecm-theme' ),
+            'label_block' => true,
+            'dynamic'     => [ 'active' => true ],
+            'condition'   => [ 'media_type' => '3d' ],
+        ] );
+
+        $rep->add_control( 'image', [
+            'label'     => __( 'الصورة', 'ecm-theme' ),
+            'type'      => \Elementor\Controls_Manager::MEDIA,
+            'condition' => [ 'media_type' => 'image' ],
+        ] );
+
+        $rep->add_control( 'popup_image', [
+            'label'       => __( 'صورة التكبير (تفتح عند الضغط)', 'ecm-theme' ),
+            'type'        => \Elementor\Controls_Manager::MEDIA,
+            'description' => __( 'تظهر مكبّرة لما الزائر يضغط على الخلية. سيبها فاضية = يستخدم نفس صورة الخلية.', 'ecm-theme' ),
+        ] );
+
         $rep->add_control( 'arrow', [
             'label'   => __( 'اتجاه السهم', 'ecm-theme' ),
             'type'    => \Elementor\Controls_Manager::SELECT,
@@ -69,14 +100,6 @@ class ECM_Widget_Control_Grid extends \Elementor\Widget_Base {
             'type'    => \Elementor\Controls_Manager::TEXTAREA,
             'rows'    => 3,
             'default' => __( 'اكتب شرح الحركة دي هنا.', 'ecm-theme' ),
-        ] );
-
-        $rep->add_control( 'glb_url', [
-            'label'       => __( 'ملف 3D خاص بالخلية (اختياري)', 'ecm-theme' ),
-            'type'        => \Elementor\Controls_Manager::TEXT,
-            'placeholder' => __( 'سيبه فاضي عشان يستخدم الملف المشترك', 'ecm-theme' ),
-            'label_block' => true,
-            'dynamic'     => [ 'active' => true ],
         ] );
 
         $this->add_control( 'cells', [
@@ -134,6 +157,14 @@ class ECM_Widget_Control_Grid extends \Elementor\Widget_Base {
             'type'         => \Elementor\Controls_Manager::SWITCHER,
             'return_value' => 'yes',
             'default'      => '',
+        ] );
+
+        $this->add_control( 'lightbox', [
+            'label'        => __( 'تكبير الصورة عند الضغط', 'ecm-theme' ),
+            'type'         => \Elementor\Controls_Manager::SWITCHER,
+            'return_value' => 'yes',
+            'default'      => 'yes',
+            'description'  => __( 'الضغط على الخلية يفتح الصورة مكبّرة في نافذة.', 'ecm-theme' ),
         ] );
 
         $this->add_control( 'model_fill', [
@@ -239,17 +270,37 @@ class ECM_Widget_Control_Grid extends \Elementor\Widget_Base {
         if ( 'card' === $style ) { $cell_cls .= ' ecm-cgrid__cell--card'; }
         if ( 'glow' === $style ) { $cell_cls .= ' ecm-cgrid__cell--card ecm-cgrid__cell--glow'; }
 
+        $lightbox = ( 'yes' === ( $s['lightbox'] ?? 'yes' ) );
+
         echo '<div class="ecm-cgrid">';
 
         foreach ( $cells as $cell ) {
-            $glb = ! empty( $cell['glb_url'] ) ? trim( $cell['glb_url'] ) : $shared;
-            $dir = $cell['arrow'] ?? 'none';
+            $type    = $cell['media_type'] ?? '3d';
+            $is_img  = ( 'image' === $type );
+            $img_url = ! empty( $cell['image']['url'] ) ? $cell['image']['url'] : '';
+            $glb     = ! empty( $cell['glb_url'] ) ? trim( $cell['glb_url'] ) : $shared;
+            $dir     = $cell['arrow'] ?? 'none';
+
+            // صورة التكبير: المخصّصة أو صورة الخلية
+            $popup = ! empty( $cell['popup_image']['url'] ) ? $cell['popup_image']['url'] : $img_url;
+            $can_zoom = ( $lightbox && '' !== $popup );
 
             echo '<div class="' . esc_attr( $cell_cls ) . '">';
 
-            // ── الإطار: الموديل + السهم ──
-            echo '<div class="ecm-cgrid__stage">';
-            if ( '' !== $glb ) {
+            // ── الإطار: المحتوى + السهم ──
+            // الصورة: الإطار كله قابل للضغط. الـ 3D: التكبير من الأيقونة بس (عشان السحب يفضل يلفّ).
+            $stage_clickable = ( $can_zoom && $is_img );
+            $stage_cls  = 'ecm-cgrid__stage' . ( $can_zoom ? ' ecm-cgrid__stage--zoom' : '' );
+            $stage_attr = $stage_clickable ? ' data-ecm-lb="' . esc_url( $popup ) . '" role="button" tabindex="0"' : '';
+            echo '<div class="' . esc_attr( $stage_cls ) . '"' . $stage_attr . '>';
+
+            if ( $is_img ) {
+                if ( '' !== $img_url ) {
+                    echo '<img class="ecm-cgrid__img" src="' . esc_url( $img_url ) . '" alt="' . esc_attr( $cell['title'] ?? '' ) . '" loading="lazy">';
+                } else {
+                    echo '<div class="ecm-cgrid__empty">🖼️ ' . esc_html__( 'اختار صورة', 'ecm-theme' ) . '</div>';
+                }
+            } elseif ( '' !== $glb ) {
                 echo ecm_3d_model_markup( [
                     'src'             => $glb,
                     'auto_rotate'     => $rotate,
@@ -263,11 +314,15 @@ class ECM_Widget_Control_Grid extends \Elementor\Widget_Base {
             } else {
                 echo '<div class="ecm-cgrid__empty">⬆️ ' . esc_html__( 'حُط رابط ملف .glb', 'ecm-theme' ) . '</div>';
             }
+
             if ( 'none' !== $dir ) {
                 $svg = $this->arrow_svg( $dir );
                 if ( $svg ) {
                     echo '<span class="ecm-cgrid__arrow ecm-cgrid__arrow--' . esc_attr( $dir ) . '">' . $svg . '</span>';
                 }
+            }
+            if ( $can_zoom ) {
+                echo '<button type="button" class="ecm-cgrid__zoom-ic" data-ecm-lb="' . esc_url( $popup ) . '" aria-label="' . esc_attr__( 'تكبير', 'ecm-theme' ) . '">⛶</button>';
             }
             echo '</div>';
 

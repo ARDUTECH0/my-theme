@@ -4,7 +4,7 @@ Theme URI:   https://ecameraman.com
 Author:      E.Camera.Man
 Author URI:  https://ecameraman.com
 Description: ثيم احترافي لموقع ECM — E.Camera.Man مع دعم Elementor كامل
-Version:     3.0.11
+Version:     3.0.12
 License:     GNU General Public License v2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Text Domain: ecm-theme
@@ -1414,12 +1414,44 @@ html { direction: rtl; }
   justify-content: center;
 }
 .ecm-cgrid__stage model-viewer { width: 100%; height: 100%; }
+.ecm-cgrid__img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .ecm-cgrid__empty {
   opacity: 0.55;
   font-size: 13px;
   text-align: center;
   padding: 20px;
 }
+
+/* الإطار القابل للضغط (صورة) */
+.ecm-cgrid__stage--zoom { cursor: zoom-in; }
+.ecm-cgrid__stage--zoom .ecm-cgrid__img { transition: transform 0.3s ease; }
+.ecm-cgrid__stage--zoom:hover .ecm-cgrid__img { transform: scale(1.04); }
+
+/* أيقونة التكبير */
+.ecm-cgrid__zoom-ic {
+  position: absolute;
+  top: 10px;
+  inset-inline-start: 10px;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: rgba(13,14,17,0.6);
+  border: 1px solid var(--ecm-border);
+  color: var(--ecm-white);
+  font-size: 15px;
+  line-height: 1;
+  cursor: zoom-in;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  z-index: 4;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  transition: opacity 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+.ecm-cgrid__cell:hover .ecm-cgrid__zoom-ic { opacity: 1; }
+.ecm-cgrid__zoom-ic:hover { background: var(--ecm-green); color: #0d0e11; border-color: var(--ecm-green); }
 
 /* الأسهم */
 .ecm-cgrid__arrow {
@@ -1465,7 +1497,47 @@ html { direction: rtl; }
 }
 @media (max-width: 560px) {
   .ecm-cgrid { grid-template-columns: 1fr; }
+  .ecm-cgrid__zoom-ic { opacity: 1; }
 }
+
+/* لايت‌بوكس تكبير الصور */
+.ecm-lb {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 4vw;
+  background: rgba(6,7,9,0.92);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+.ecm-lb.is-open { display: flex; animation: ecm-lb-in 0.25s ease; }
+@keyframes ecm-lb-in { from { opacity: 0; } to { opacity: 1; } }
+.ecm-lb__img {
+  max-width: 92vw;
+  max-height: 88vh;
+  object-fit: contain;
+  border-radius: var(--ecm-radius-md);
+  box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+}
+.ecm-lb__close {
+  position: absolute;
+  top: 18px;
+  inset-inline-end: 22px;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid var(--ecm-border);
+  color: #fff;
+  font-size: 30px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.ecm-lb__close:hover { background: var(--ecm-green); color: #0d0e11; border-color: var(--ecm-green); }
 
 
 /* ════════════════════════════════════════════════════════════
