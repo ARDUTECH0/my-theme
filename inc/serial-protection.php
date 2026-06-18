@@ -992,17 +992,184 @@ add_action( 'woocommerce_before_calculate_totals', function ( $cart ) {
 // §  API — عرض الأجهزة + إحصائيات (بتوكن أو صلاحية أدمن)
 // ════════════════════════════════════════════════════════════
 add_action( 'rest_api_init', function () {
+    // عرض + إضافة الأجهزة (نفس المسار)
     register_rest_route( 'ecm/v1', '/devices', [
-        'methods'             => 'GET',
-        'callback'            => 'ecm_rest_list_devices',
-        'permission_callback' => 'ecm_api_auth',
+        [
+            'methods'             => 'GET',
+            'callback'            => 'ecm_rest_list_devices',
+            'permission_callback' => 'ecm_api_auth',
+        ],
+        [
+            'methods'             => 'POST',
+            'callback'            => 'ecm_rest_add_devices',
+            'permission_callback' => 'ecm_api_auth',
+        ],
     ] );
     register_rest_route( 'ecm/v1', '/stats', [
         'methods'             => 'GET',
         'callback'            => 'ecm_rest_stats',
         'permission_callback' => 'ecm_api_auth',
     ] );
+    // تسجيل دخول الأدمن (يرجّع التوكن)
+    register_rest_route( 'ecm/v1', '/login', [
+        'methods'             => 'POST',
+        'callback'            => 'ecm_rest_login',
+        'permission_callback' => '__return_true',
+    ] );
+    // إيقاف/تشغيل/فك ربط جهاز
+    register_rest_route( 'ecm/v1', '/device-status', [
+        'methods'             => 'POST',
+        'callback'            => 'ecm_rest_device_status',
+        'permission_callback' => 'ecm_api_auth',
+    ] );
+    // المبيعات (المنتجات اللي اتباعت + مين + أنهي جهاز)
+    register_rest_route( 'ecm/v1', '/sales', [
+        'methods'             => 'GET',
+        'callback'            => 'ecm_rest_sales',
+        'permission_callback' => 'ecm_api_auth',
+    ] );
 } );
+
+/** تسجيل دخول الأدمن → يرجّع توكن الـ API */
+function ecm_rest_login( $request ) {
+    $username = sanitize_text_field( (string) $request->get_param( 'username' ) );
+    $password = (string) $request->get_param( 'password' );
+    if ( '' === $username || '' === $password ) {
+        return new WP_Error( 'ecm_missing', 'اكتب اسم المستخدم وكلمة المرور', [ 'status' => 400 ] );
+    }
+    $user = wp_authenticate( $username, $password );
+    if ( is_wp_error( $user ) ) {
+        return new WP_Error( 'ecm_invalid', 'بيانات الدخول غير صحيحة', [ 'status' => 401 ] );
+    }
+    if ( ! user_can( $user, 'manage_woocommerce' ) ) {
+        return new WP_Error( 'ecm_forbidden', 'الحساب ده مش مسموح له بالدخول', [ 'status' => 403 ] );
+    }
+    return rest_ensure_response( [
+        'ok'    => true,
+        'token' => ecm_get_api_token(),
+        'name'  => $user->display_name,
+        'email' => $user->user_email,
+    ] );
+}
+
+/** إضافة سيريالات عبر الـ API */
+function ecm_rest_add_devices( $request ) {
+    $serials  = $request->get_param( 'serials' );
+    $warranty = (int) $request->get_param( 'warranty_months' );
+    if ( $warranty <= 0 ) {
+        $warranty = 12;
+    }
+    if ( is_string( $serials ) ) {
+        $serials = preg_split( '/[\r\n,]+/', $serials );
+    }
+    if ( ! is_array( $serials ) ) {
+        $serials = [];
+    }
+    $added   = 0;
+    $skipped = 0;
+    foreach ( $serials as $s ) {
+        $s = sanitize_text_field( (string) $s );
+        if ( '' === trim( $s ) ) {
+            continue;
+        }
+        if ( ecm_serial_add( $s, $warranty ) ) {
+            $added++;
+        } else {
+            $skipped++;
+        }
+    }
+    return rest_ensure_response( [ 'ok' => true, 'added' => $added, 'skipped' => $skipped ] );
+}
+
+/** إيقاف/تشغيل/فك ربط جهاز */
+function ecm_rest_device_status( $request ) {
+    global $wpdb;
+    $serial = (string) $request->get_param( 'serial' );
+    $action = sanitize_text_field( (string) $request->get_param( 'action' ) ); // disable | enable | unbind
+    $row    = ecm_serial_find( $serial );
+    if ( ! $row ) {
+        return new WP_Error( 'ecm_notfound', 'الجهاز غير موجود', [ 'status' => 404 ] );
+    }
+    $table = ecm_serial_table();
+    switch ( $action ) {
+        case 'disable':
+            $wpdb->update( $table, [ 'status' => 'disabled' ], [ 'id' => $row->id ] );
+            break;
+        case 'enable':
+            $wpdb->update( $table, [ 'status' => 'genuine' ], [ 'id' => $row->id ] );
+            break;
+        case 'unbind':
+            $wpdb->update( $table, [ 'user_id' => 0, 'email' => '', 'token' => '', 'activated_at' => null ], [ 'id' => $row->id ] );
+            break;
+        default:
+            return new WP_Error( 'ecm_badaction', 'أمر غير معروف (disable | enable | unbind)', [ 'status' => 400 ] );
+    }
+    return rest_ensure_response( [ 'ok' => true, 'serial' => $row->serial, 'action' => $action ] );
+}
+
+/** المبيعات: المنتجات اللي اتباعت + المشتري + الجهاز */
+function ecm_rest_sales( $request ) {
+    if ( ! class_exists( 'WooCommerce' ) || ! function_exists( 'wc_get_orders' ) ) {
+        return rest_ensure_response( [ 'ok' => false, 'message' => 'WooCommerce غير مفعّل', 'count' => 0, 'sales' => [] ] );
+    }
+    $limit  = min( 300, max( 1, (int) ( $request->get_param( 'limit' ) ?: 100 ) ) );
+    $search = sanitize_text_field( (string) $request->get_param( 'search' ) );
+
+    $orders = wc_get_orders( [
+        'limit'   => $limit,
+        'status'  => [ 'completed', 'processing' ],
+        'orderby' => 'date',
+        'order'   => 'DESC',
+    ] );
+
+    $sales    = [];
+    $count    = 0;
+    $products = [];
+    foreach ( $orders as $order ) {
+        $uid    = $order->get_customer_id();
+        $serial = ( $uid && function_exists( 'ecm_user_primary_serial' ) ) ? ecm_user_primary_serial( $uid ) : '';
+        $buyer  = trim( $order->get_formatted_billing_full_name() );
+        if ( '' === $buyer ) {
+            $buyer = $order->get_billing_email();
+        }
+        foreach ( $order->get_items() as $item ) {
+            $name = $item->get_name();
+            $qty  = (int) $item->get_quantity();
+            $count += $qty;
+            $products[ $name ] = ( $products[ $name ] ?? 0 ) + $qty;
+
+            if ( '' !== $search && stripos( $name . ' ' . $buyer . ' ' . $order->get_billing_email() . ' ' . $serial, $search ) === false ) {
+                continue;
+            }
+            $sales[] = [
+                'order_id'      => $order->get_id(),
+                'product'       => $name,
+                'qty'           => $qty,
+                'total'         => (float) $order->get_line_total( $item, true ),
+                'currency'      => $order->get_currency(),
+                'buyer'         => $buyer,
+                'email'         => $order->get_billing_email(),
+                'device_serial' => $serial,
+                'date'          => $order->get_date_created() ? $order->get_date_created()->date( 'Y-m-d' ) : '',
+                'status'        => $order->get_status(),
+            ];
+        }
+    }
+
+    // ملخّص لكل منتج
+    $summary = [];
+    foreach ( $products as $pname => $pqty ) {
+        $summary[] = [ 'product' => $pname, 'sold' => $pqty ];
+    }
+
+    return rest_ensure_response( [
+        'ok'            => true,
+        'count'         => $count,
+        'orders'        => count( $orders ),
+        'products_sold' => $summary,
+        'sales'         => $sales,
+    ] );
+}
 
 function ecm_rest_list_devices( $request ) {
     global $wpdb;
@@ -1023,9 +1190,13 @@ function ecm_rest_list_devices( $request ) {
     $args  = [];
 
     if ( 'activated' === $status ) {
-        $where .= ' AND user_id > 0';
+        $where .= " AND user_id > 0 AND status <> 'disabled'";
     } elseif ( 'available' === $status ) {
-        $where .= ' AND user_id = 0';
+        $where .= " AND user_id = 0 AND status <> 'disabled'";
+    } elseif ( 'disabled' === $status ) {
+        $where .= " AND status = 'disabled'";
+    } elseif ( 'expired' === $status ) {
+        $where .= ' AND user_id > 0 AND activated_at IS NOT NULL AND DATE_ADD(activated_at, INTERVAL warranty_months MONTH) <= NOW()';
     }
     if ( 'valid' === $warr ) {
         $where .= ' AND user_id > 0 AND activated_at IS NOT NULL AND DATE_ADD(activated_at, INTERVAL warranty_months MONTH) > NOW()';
@@ -1056,15 +1227,28 @@ function ecm_rest_list_devices( $request ) {
         $act_ts   = $r->activated_at ? strtotime( $r->activated_at ) : 0;
         $warr_end = $act_ts ? strtotime( '+' . $warr_m . ' months', $act_ts ) : 0;
         $valid    = $warr_end ? ( current_time( 'timestamp' ) < $warr_end ) : false;
-        $out[]    = [
+
+        // حالة مبسّطة للتطبيق
+        if ( 'disabled' === $r->status ) {
+            $dstatus = 'disabled';
+        } elseif ( (int) $r->user_id > 0 ) {
+            $dstatus = $valid ? 'activated' : 'expired';
+        } else {
+            $dstatus = 'available';
+        }
+
+        $out[] = [
             'serial'           => $r->serial,
+            'status'           => $dstatus,
             'activated'        => ( (int) $r->user_id > 0 ),
+            'disabled'         => ( 'disabled' === $r->status ),
             'email'            => $r->email,
             'user_id'          => (int) $r->user_id,
             'warranty_months'  => $warr_m,
             'activated_at'     => $r->activated_at,
             'registered_since' => $act_ts ? ecm_secs_to_ar( current_time( 'timestamp' ) - $act_ts ) : '',
             'warranty_until'   => $warr_end ? date_i18n( 'Y-m-d', $warr_end ) : '',
+            'expiry_date'      => $warr_end ? date_i18n( 'Y-m-d', $warr_end ) : '',
             'warranty_valid'   => $valid,
             'warranty_left'    => ( $valid && $warr_end ) ? ecm_secs_to_ar( $warr_end - current_time( 'timestamp' ) ) : '',
             'free_all'         => ( (int) $r->free_all === 1 ),
@@ -1083,12 +1267,27 @@ function ecm_rest_list_devices( $request ) {
 function ecm_rest_stats( $request ) {
     global $wpdb;
     $table = ecm_serial_table();
+
+    $total     = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table}" );
+    $activated = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE user_id > 0" );
+    $available = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE user_id = 0" );
+    $disabled  = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE status = 'disabled'" );
+    $valid     = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE user_id > 0 AND activated_at IS NOT NULL AND DATE_ADD(activated_at, INTERVAL warranty_months MONTH) > NOW()" );
+    $expiring  = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE user_id > 0 AND activated_at IS NOT NULL AND DATE_ADD(activated_at, INTERVAL warranty_months MONTH) BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 30 DAY)" );
+    $expired   = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE user_id > 0 AND activated_at IS NOT NULL AND DATE_ADD(activated_at, INTERVAL warranty_months MONTH) <= NOW()" );
+
     return rest_ensure_response( [
-        'total'         => (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table}" ),
-        'activated'     => (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE user_id > 0" ),
-        'available'     => (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE user_id = 0" ),
-        'warranty_valid'=> (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE user_id > 0 AND activated_at IS NOT NULL AND DATE_ADD(activated_at, INTERVAL warranty_months MONTH) > NOW()" ),
-        'expiring_30d'  => (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE user_id > 0 AND activated_at IS NOT NULL AND DATE_ADD(activated_at, INTERVAL warranty_months MONTH) BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 30 DAY)" ),
-        'expired'       => (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE user_id > 0 AND activated_at IS NOT NULL AND DATE_ADD(activated_at, INTERVAL warranty_months MONTH) <= NOW()" ),
+        // أسماء متوافقة مع التطبيق
+        'total_devices'  => $total,
+        'active'         => $activated,
+        'available'      => $available,
+        'disabled'       => $disabled,
+        'expiring'       => $expiring,
+        'expired'        => $expired,
+        // أسماء قديمة (توافق)
+        'total'          => $total,
+        'activated'      => $activated,
+        'warranty_valid' => $valid,
+        'expiring_30d'   => $expiring,
     ] );
 }
