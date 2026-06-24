@@ -229,20 +229,54 @@ function ecm_serials_api_page() {
         </div>
 
         <div class="ecm-sp-box ecm-sp-endpoints">
-            <h2><?php esc_html_e( 'نقاط النهاية', 'ecm-theme' ); ?></h2>
+            <h2><?php esc_html_e( 'نقاط النهاية (Endpoints)', 'ecm-theme' ); ?></h2>
+            <p style="color:#646970;font-size:12.5px;">
+                <?php esc_html_e( 'المسارات المحمية: حُط التوكن في', 'ecm-theme' ); ?>
+                <code style="display:inline;padding:2px 6px;">X-ECM-Token: TOKEN</code>
+                <?php esc_html_e( 'أو', 'ecm-theme' ); ?> <code style="display:inline;padding:2px 6px;">?api_key=TOKEN</code>
+            </p>
 
-            <h3><?php esc_html_e( 'قائمة الأجهزة (مع فلاتر)', 'ecm-theme' ); ?></h3>
-            <code>GET <?php echo esc_html( $api_base ); ?>/devices?api_key=<?php echo esc_html( substr( $api_token, 0, 8 ) ); ?>…</code>
-            <code>&amp;status=activated | available</code>
-            <code>&amp;warranty=valid | expired</code>
-            <code>&amp;expiring=30   (ضمانه يخلص خلال 30 يوم)</code>
-            <code>&amp;search=ECM-0001 &amp; limit=50 &amp; offset=0</code>
+            <h3>📋 <?php esc_html_e( 'قائمة الأجهزة (محمي · GET)', 'ecm-theme' ); ?></h3>
+            <code>GET <?php echo esc_html( $api_base ); ?>/devices?api_key=TOKEN</code>
+            <code>الفلاتر: &amp;status=activated|available|disabled|expired · &amp;warranty=valid|expired · &amp;expiring=30 · &amp;search=ECM · &amp;limit=50 · &amp;offset=0</code>
+            <code style="background:#eef7ee;">يرجّع: serial · status · activated · disabled · email · warranty_months · activated_at · warranty_until · warranty_left · free_all</code>
 
-            <h3><?php esc_html_e( 'الإحصائيات', 'ecm-theme' ); ?></h3>
+            <h3>➕ <?php esc_html_e( 'إضافة أجهزة (محمي · POST)', 'ecm-theme' ); ?></h3>
+            <code>POST <?php echo esc_html( $api_base ); ?>/devices?api_key=TOKEN</code>
+            <code>Body (JSON): { "serials": ["ECM-0001","ECM-0002"], "warranty_months": 12 }</code>
+
+            <h3>⛔ <?php esc_html_e( 'إيقاف/تشغيل/فك ربط جهاز (محمي · POST)', 'ecm-theme' ); ?></h3>
+            <code>POST <?php echo esc_html( $api_base ); ?>/device-status?api_key=TOKEN</code>
+            <code>Body (JSON): { "serial": "ECM-0001", "action": "disable | enable | unbind" }</code>
+
+            <h3>📊 <?php esc_html_e( 'الإحصائيات (محمي · GET)', 'ecm-theme' ); ?></h3>
             <code>GET <?php echo esc_html( $api_base ); ?>/stats?api_key=TOKEN</code>
+            <code style="background:#eef7ee;">يرجّع: total_devices · active · available · disabled · expiring · expired</code>
 
-            <h3><?php esc_html_e( 'التحقق (عام — للتطبيق وقت الاستخدام)', 'ecm-theme' ); ?></h3>
+            <h3>🛒 <?php esc_html_e( 'المبيعات (محمي · GET)', 'ecm-theme' ); ?></h3>
+            <code>GET <?php echo esc_html( $api_base ); ?>/sales?api_key=TOKEN&amp;search=&amp;limit=100</code>
+            <code style="background:#eef7ee;">يرجّع لكل عملية: product · qty · total · buyer · email · device_serial · date</code>
+
+            <h3>🔑 <?php esc_html_e( 'دخول الأدمن (عام · POST)', 'ecm-theme' ); ?></h3>
+            <code>POST <?php echo esc_html( $api_base ); ?>/login</code>
+            <code>Body (JSON): { "username": "admin", "password": "***" } → يرجّع { token }</code>
+
+            <h3>🔍 <?php esc_html_e( 'التحقق من جهاز (عام · GET — للجهاز/الفلاشر)', 'ecm-theme' ); ?></h3>
             <code>GET <?php echo esc_html( $api_base ); ?>/verify?serial=ECM-0001&amp;email=USER</code>
+            <code style="background:#eef7ee;">يرجّع: ok · genuine · bound · match · warranty_until · warranty_valid</code>
+
+            <hr style="margin:22px 0;border:none;border-top:1px solid #e2e4e7;">
+            <h2 style="margin-top:0;">📱 <?php esc_html_e( 'API تطبيق العميل', 'ecm-theme' ); ?></h2>
+
+            <h3>🔓 <?php esc_html_e( 'دخول العميل (عام · POST)', 'ecm-theme' ); ?></h3>
+            <code>POST <?php echo esc_html( $api_base ); ?>/app/login</code>
+            <code>Body (JSON): { "username": "user@mail.com", "password": "***" }</code>
+            <code style="background:#eef7ee;">يرجّع: token (خاص بالعميل) · user_id · name · email · devices[]</code>
+
+            <h3>🎬 <?php esc_html_e( 'منتجات العميل (حسب سيريال جهازه · GET)', 'ecm-theme' ); ?></h3>
+            <code>GET <?php echo esc_html( $api_base ); ?>/app/products?token=USER_TOKEN&amp;serial=ECM-0001</code>
+            <code style="background:#eef7ee;">يرجّع: products[] (product_id · name · download_url · image · expires)</code>
+            <code style="color:#646970;">لو الجهاز مش مسجّل للعميل → ok:false</code>
         </div>
     </div>
     <?php
@@ -1289,5 +1323,131 @@ function ecm_rest_stats( $request ) {
         'activated'      => $activated,
         'warranty_valid' => $valid,
         'expiring_30d'   => $expiring,
+    ] );
+}
+
+
+// ════════════════════════════════════════════════════════════
+// §  API تطبيق العميل — دخول + عرض منتجاته حسب سيريال جهازه
+// ════════════════════════════════════════════════════════════
+
+/** توكن خاص بكل مستخدم (للتطبيق) */
+function ecm_user_app_token( int $user_id ): string {
+    $t = (string) get_user_meta( $user_id, 'ecm_app_token', true );
+    if ( '' === $t ) {
+        $t = wp_generate_password( 48, false );
+        update_user_meta( $user_id, 'ecm_app_token', $t );
+    }
+    return $t;
+}
+
+/** يرجّع المستخدم من توكن التطبيق */
+function ecm_user_from_app_token( string $token ) {
+    if ( '' === $token ) {
+        return null;
+    }
+    $users = get_users( [
+        'meta_key'   => 'ecm_app_token',
+        'meta_value' => $token,
+        'number'     => 1,
+        'count_total'=> false,
+    ] );
+    return $users ? $users[0] : null;
+}
+
+add_action( 'rest_api_init', function () {
+    // دخول العميل → يرجّع توكن المستخدم
+    register_rest_route( 'ecm/v1', '/app/login', [
+        'methods'             => 'POST',
+        'callback'            => 'ecm_rest_app_login',
+        'permission_callback' => '__return_true',
+    ] );
+    // منتجات العميل (حسب سيريال جهازه)
+    register_rest_route( 'ecm/v1', '/app/products', [
+        'methods'             => 'GET',
+        'callback'            => 'ecm_rest_app_products',
+        'permission_callback' => '__return_true',
+    ] );
+} );
+
+/** دخول العميل (أي مستخدم) → توكن خاص بيه */
+function ecm_rest_app_login( $request ) {
+    $username = sanitize_text_field( (string) $request->get_param( 'username' ) );
+    $password = (string) $request->get_param( 'password' );
+    if ( '' === $username || '' === $password ) {
+        return new WP_Error( 'ecm_missing', 'اكتب اسم المستخدم وكلمة المرور', [ 'status' => 400 ] );
+    }
+    $user = wp_authenticate( $username, $password );
+    if ( is_wp_error( $user ) ) {
+        return new WP_Error( 'ecm_invalid', 'بيانات الدخول غير صحيحة', [ 'status' => 401 ] );
+    }
+    $token = ecm_user_app_token( $user->ID );
+
+    // أجهزته المسجّلة (سيريالات)
+    $serials = [];
+    if ( function_exists( 'ecm_user_devices' ) ) {
+        foreach ( ecm_user_devices( $user->ID ) as $d ) {
+            $serials[] = $d->serial;
+        }
+    }
+
+    return rest_ensure_response( [
+        'ok'      => true,
+        'token'   => $token,
+        'user_id' => $user->ID,
+        'name'    => $user->display_name,
+        'email'   => $user->user_email,
+        'devices' => $serials,
+    ] );
+}
+
+/** منتجات العميل اللي اشتراها — بشرط الجهاز مسجّل لحسابه */
+function ecm_rest_app_products( $request ) {
+    $token  = sanitize_text_field( (string) $request->get_param( 'token' ) );
+    $serial = (string) $request->get_param( 'serial' );
+
+    $user = ecm_user_from_app_token( $token );
+    if ( ! $user ) {
+        return new WP_Error( 'ecm_unauth', 'توكن غير صالح — سجّل دخولك تاني', [ 'status' => 401 ] );
+    }
+
+    // لو اتبعت سيريال → لازم يكون مسجّل لنفس المستخدم
+    if ( '' !== trim( $serial ) ) {
+        $row = ecm_serial_find( $serial );
+        if ( ! $row || (int) $row->user_id !== (int) $user->ID ) {
+            return rest_ensure_response( [
+                'ok'       => false,
+                'message'  => 'الجهاز ده مش مسجّل لحسابك',
+                'products' => [],
+            ] );
+        }
+    }
+
+    // المنتجات الرقمية اللي اشتراها (Downloads)
+    $products = [];
+    if ( function_exists( 'wc_get_customer_available_downloads' ) ) {
+        $downloads = wc_get_customer_available_downloads( $user->ID );
+        $seen      = [];
+        foreach ( $downloads as $d ) {
+            $pid = (int) ( $d['product_id'] ?? 0 );
+            if ( $pid && isset( $seen[ $pid ] ) ) {
+                continue;
+            }
+            $seen[ $pid ] = 1;
+            $products[] = [
+                'product_id'   => $pid,
+                'name'         => $d['product_name'] ?? '',
+                'download_url' => $d['download_url'] ?? '',
+                'image'        => $pid ? ( get_the_post_thumbnail_url( $pid, 'medium' ) ?: '' ) : '',
+                'expires'      => ! empty( $d['access_expires'] ) ? date_i18n( 'Y-m-d', is_numeric( $d['access_expires'] ) ? (int) $d['access_expires'] : strtotime( $d['access_expires'] ) ) : '',
+            ];
+        }
+    }
+
+    return rest_ensure_response( [
+        'ok'       => true,
+        'name'     => $user->display_name,
+        'count'    => count( $products ),
+        'products' => $products,
     ] );
 }
