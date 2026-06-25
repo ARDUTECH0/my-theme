@@ -4,7 +4,7 @@ Theme URI:   https://ecameraman.com
 Author:      E.Camera.Man
 Author URI:  https://ecameraman.com
 Description: ثيم احترافي لموقع ECM — E.Camera.Man مع دعم Elementor كامل
-Version:     3.0.42
+Version:     3.0.43
 License:     GNU General Public License v2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Text Domain: ecm-theme
@@ -5833,5 +5833,35 @@ body.admin-bar #ecm-header {
 
 @media (max-width: 480px) {
   .ecm-trust { grid-template-columns: 1fr; }
+}
+
+
+/* ════════════════════════════════════════════════════════════
+   صفحة المنتج — الوصف تحت الصورة، وكارت الشراء ثابت جنبهم بدون تغطية
+   ════════════════════════════════════════════════════════════ */
+@media (min-width: 861px) {
+  .woocommerce div.product {
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr) !important;
+    grid-template-areas:
+      "gallery summary"
+      "tabs    summary"
+      "related related"
+      "upsells upsells" !important;
+    align-items: start;
+  }
+  .woocommerce div.product .woocommerce-product-gallery { grid-area: gallery; }
+  .woocommerce div.product .summary.entry-summary {
+    grid-area: summary;
+    align-self: start;
+    position: sticky;
+    top: 100px;
+  }
+  .woocommerce div.product .woocommerce-tabs {
+    grid-area: tabs;
+    grid-column: auto !important;   /* يلغي الامتداد الكامل القديم */
+    margin-top: 26px;
+  }
+  .woocommerce div.product .related.products { grid-area: related; }
+  .woocommerce div.product .upsells.products { grid-area: upsells; }
 }
 
