@@ -376,7 +376,7 @@ add_action( 'wp_enqueue_scripts', 'ecm_enqueue_assets' );
 
 
 // ── THEME VERSION CONSTANT ───────────────────────────────────
-define( 'ECM_VERSION', '3.0.49' );
+define( 'ECM_VERSION', '3.0.50' );
 
 
 // ── INCLUDE: FRONT PAGE CUSTOMIZER ──────────────────────────
@@ -425,6 +425,9 @@ require_once get_template_directory() . '/inc/duplicate-page.php';
 
 // ── INCLUDE: متجر WooCommerce (منتجات رقمية) ─────────────────
 require_once get_template_directory() . '/inc/woocommerce.php';
+
+// ── INCLUDE: حقول المنتج (صورة التطبيق + الشرح) ──────────────
+require_once get_template_directory() . '/inc/product-fields.php';
 
 // ── INCLUDE: تسجيل الدخول بحساب Google ───────────────────────
 require_once get_template_directory() . '/inc/google-login.php';

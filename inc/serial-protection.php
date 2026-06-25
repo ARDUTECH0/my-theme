@@ -1432,6 +1432,8 @@ function ecm_rest_app_catalog( $request ) {
             'on_sale'     => $p->is_on_sale(),
             'downloadable'=> $p->is_downloadable(),
             'image'       => $img ?: '',
+            // صورة خاصة بالتطبيق (جودة عالية) — أو صورة الموقع لو مش متحطّة
+            'app_image'   => function_exists( 'ecm_product_app_image' ) ? ecm_product_app_image( $p->get_id() ) : ( $img ?: '' ),
             'description' => wp_strip_all_tags( $p->get_short_description() ?: $p->get_description() ),
             'permalink'   => get_permalink( $p->get_id() ),
             // رابط الشراء السريع → تشيك‌اوت مباشرة بالمنتج
@@ -1535,6 +1537,8 @@ function ecm_rest_app_products( $request ) {
                     'product_id'   => $pid,
                     'name'         => $item->get_name(),
                     'image'        => get_the_post_thumbnail_url( $pid, 'medium' ) ?: '',
+                    'app_image'    => function_exists( 'ecm_product_app_image' ) ? ecm_product_app_image( $pid ) : '',
+                    'description'  => $product ? wp_strip_all_tags( $product->get_short_description() ?: $product->get_description() ) : '',
                     // رابط تنزيل مباشر (للمنتجات الرقمية فقط)
                     'download_url' => $downloadable ? ecm_app_download_url( $token, $pid ) : '',
                     'downloadable' => (bool) $downloadable,
