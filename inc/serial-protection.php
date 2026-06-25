@@ -1402,26 +1402,13 @@ function ecm_rest_app_login( $request ) {
     ] );
 }
 
-/** منتجات العميل اللي اشتراها — بشرط الجهاز مسجّل لحسابه */
+/** منتجات العميل اللي اشتراها — التوكن وحده كافي (السيريال اختياري) */
 function ecm_rest_app_products( $request ) {
-    $token  = sanitize_text_field( (string) $request->get_param( 'token' ) );
-    $serial = (string) $request->get_param( 'serial' );
+    $token = sanitize_text_field( (string) $request->get_param( 'token' ) );
 
     $user = ecm_user_from_app_token( $token );
     if ( ! $user ) {
         return new WP_Error( 'ecm_unauth', 'توكن غير صالح — سجّل دخولك تاني', [ 'status' => 401 ] );
-    }
-
-    // لو اتبعت سيريال → لازم يكون مسجّل لنفس المستخدم
-    if ( '' !== trim( $serial ) ) {
-        $row = ecm_serial_find( $serial );
-        if ( ! $row || (int) $row->user_id !== (int) $user->ID ) {
-            return rest_ensure_response( [
-                'ok'       => false,
-                'message'  => 'الجهاز ده مش مسجّل لحسابك',
-                'products' => [],
-            ] );
-        }
     }
 
     // المنتجات اللي اشتراها العميل فعلًا (من طلباته المكتملة/قيد التنفيذ) فقط
