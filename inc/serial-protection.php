@@ -278,6 +278,11 @@ function ecm_serials_api_page() {
             <code style="background:#eef7ee;">يرجّع: products[] (product_id · name · download_url · image · expires)</code>
             <code style="color:#1a7f37;">download_url = رابط جاهز، الضغط عليه يُنزّل الملف مباشرة (بتوكن العميل — من غير تسجيل دخول بالمتصفح)</code>
             <code style="color:#646970;">لو الجهاز مش مسجّل للعميل → ok:false</code>
+
+            <h3>🛍️ <?php esc_html_e( 'كتالوج المنتجات للشراء (GET)', 'ecm-theme' ); ?></h3>
+            <code>GET <?php echo esc_html( $api_base ); ?>/app/catalog?token=USER_TOKEN&amp;search=&amp;limit=50</code>
+            <code style="background:#eef7ee;">يرجّع: products[] (product_id · name · price · price_html · currency · on_sale · image · description · buy_url)</code>
+            <code style="color:#1a7f37;">buy_url = رابط شراء سريع، الضغط عليه يضيف المنتج للسلة ويفتح الدفع مباشرة (ويسجّل دخول العميل بالتوكن)</code>
         </div>
     </div>
     <?php
@@ -1375,7 +1380,98 @@ add_action( 'rest_api_init', function () {
         'callback'            => 'ecm_rest_app_download',
         'permission_callback' => '__return_true',
     ] );
+    // كتالوج المنتجات المتاحة للشراء
+    register_rest_route( 'ecm/v1', '/app/catalog', [
+        'methods'             => 'GET',
+        'callback'            => 'ecm_rest_app_catalog',
+        'permission_callback' => '__return_true',
+    ] );
 } );
+
+/** رابط شراء سريع: يضيف المنتج للسلة ويودّي تشيك‌اوت (بتوكن العميل) */
+function ecm_app_buy_url( int $product_id, string $token = '' ): string {
+    $args = [ 'ecm_buy' => $product_id ];
+    if ( '' !== $token ) {
+        $args['token'] = rawurlencode( $token );
+    }
+    return add_query_arg( $args, home_url( '/' ) );
+}
+
+/** كتالوج المنتجات المتاحة للشراء */
+function ecm_rest_app_catalog( $request ) {
+    if ( ! function_exists( 'wc_get_products' ) ) {
+        return new WP_Error( 'ecm_nowc', 'WooCommerce غير مفعّل', [ 'status' => 500 ] );
+    }
+    $token  = sanitize_text_field( (string) $request->get_param( 'token' ) );
+    $search = sanitize_text_field( (string) $request->get_param( 'search' ) );
+    $limit  = min( 100, max( 1, (int) ( $request->get_param( 'limit' ) ?: 50 ) ) );
+
+    $items = wc_get_products( [
+        'status'  => 'publish',
+        'limit'   => $limit,
+        'orderby' => 'date',
+        'order'   => 'DESC',
+        's'       => $search,
+    ] );
+
+    $out = [];
+    foreach ( $items as $p ) {
+        if ( ! $p->is_purchasable() && ! $p->is_type( 'variable' ) ) {
+            continue;
+        }
+        $img = $p->get_image_id() ? wp_get_attachment_image_url( $p->get_image_id(), 'large' ) : '';
+        if ( ! $img && function_exists( 'wc_placeholder_img_src' ) ) {
+            $img = wc_placeholder_img_src();
+        }
+        $out[] = [
+            'product_id'  => $p->get_id(),
+            'name'        => $p->get_name(),
+            'price'       => (float) $p->get_price(),
+            'price_html'  => wp_strip_all_tags( $p->get_price_html() ),
+            'currency'    => get_woocommerce_currency(),
+            'on_sale'     => $p->is_on_sale(),
+            'downloadable'=> $p->is_downloadable(),
+            'image'       => $img ?: '',
+            'description' => wp_strip_all_tags( $p->get_short_description() ?: $p->get_description() ),
+            'permalink'   => get_permalink( $p->get_id() ),
+            // رابط الشراء السريع → تشيك‌اوت مباشرة بالمنتج
+            'buy_url'     => ecm_app_buy_url( $p->get_id(), $token ),
+        ];
+    }
+
+    return rest_ensure_response( [
+        'ok'       => true,
+        'count'    => count( $out ),
+        'products' => $out,
+    ] );
+}
+
+/** معالج الشراء السريع: تسجيل دخول بالتوكن + إضافة للسلة + تحويل للدفع */
+add_action( 'template_redirect', function () {
+    if ( empty( $_GET['ecm_buy'] ) ) {
+        return;
+    }
+    $pid   = (int) $_GET['ecm_buy'];
+    $token = isset( $_GET['token'] ) ? sanitize_text_field( wp_unslash( $_GET['token'] ) ) : '';
+
+    // سجّل دخول العميل بالتوكن (لو اتبعت) عشان التشيك‌اوت يبقى مربوط بحسابه
+    if ( '' !== $token && ! is_user_logged_in() ) {
+        $user = ecm_user_from_app_token( $token );
+        if ( $user ) {
+            wp_set_current_user( $user->ID );
+            wp_set_auth_cookie( $user->ID, true );
+        }
+    }
+
+    if ( ! function_exists( 'WC' ) || ! WC()->cart ) {
+        wp_safe_redirect( home_url( '/' ) );
+        exit;
+    }
+    WC()->cart->empty_cart();
+    WC()->cart->add_to_cart( $pid );
+    wp_safe_redirect( wc_get_checkout_url() );
+    exit;
+}, 5 );
 
 /** دخول العميل (أي مستخدم) → توكن خاص بيه */
 function ecm_rest_app_login( $request ) {
