@@ -4,7 +4,7 @@ Theme URI:   https://ecameraman.com
 Author:      E.Camera.Man
 Author URI:  https://ecameraman.com
 Description: ثيم احترافي لموقع ECM — E.Camera.Man مع دعم Elementor كامل
-Version:     3.0.47
+Version:     3.0.48
 License:     GNU General Public License v2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Text Domain: ecm-theme
@@ -5863,5 +5863,59 @@ body.admin-bar #ecm-header {
   }
   .woocommerce div.product .related.products { grid-area: related; }
   .woocommerce div.product .upsells.products { grid-area: upsells; }
+}
+
+
+/* ════════════════════════════════════════════════════════════
+   شبكة المنتجات — انتظام كامل وكروت بنفس الارتفاع (نهائي)
+   ════════════════════════════════════════════════════════════ */
+.woocommerce ul.products {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  list-style: none !important;
+}
+.woocommerce ul.products::before,
+.woocommerce ul.products::after { content: none !important; display: none !important; }
+
+.woocommerce ul.products.columns-1 { grid-template-columns: 1fr !important; }
+.woocommerce ul.products.columns-2 { grid-template-columns: repeat(2, 1fr) !important; }
+.woocommerce ul.products.columns-3 { grid-template-columns: repeat(3, 1fr) !important; }
+.woocommerce ul.products.columns-4 { grid-template-columns: repeat(4, 1fr) !important; }
+.woocommerce ul.products.columns-5 { grid-template-columns: repeat(5, 1fr) !important; }
+.woocommerce ul.products.columns-6 { grid-template-columns: repeat(6, 1fr) !important; }
+
+/* الكارت: يلغي الفلوت/العرض من ووكومرس + بنفس الارتفاع */
+.woocommerce ul.products li.product {
+  width: auto !important;
+  max-width: none !important;
+  margin: 0 !important;
+  float: none !important;
+  clear: none !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+/* الصورة بنسبة ثابتة عشان كل الكروت تبدأ من نفس النقطة */
+.woocommerce ul.products li.product a img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+}
+/* الزر يتدفع لتحت → كل الكروت تتسطّر مظبوط */
+.woocommerce ul.products li.product .button,
+.woocommerce ul.products li.product .added_to_cart {
+  margin-top: auto !important;
+}
+
+/* متجاوب */
+@media (max-width: 880px) {
+  .woocommerce ul.products,
+  .woocommerce ul.products[class*="columns-"] { grid-template-columns: repeat(2, 1fr) !important; }
+}
+@media (max-width: 560px) {
+  .woocommerce ul.products,
+  .woocommerce ul.products[class*="columns-"] { grid-template-columns: 1fr !important; }
 }
 

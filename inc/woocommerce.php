@@ -68,8 +68,75 @@ add_action( 'woocommerce_after_main_content', function () {
 }, 10 );
 
 // ── عدد المنتجات في الصف والصفحة ──────────────────────────────
-add_filter( 'loop_shop_columns', function () { return 3; }, 20 );
-add_filter( 'loop_shop_per_page', function () { return 12; }, 20 );
+add_filter( 'loop_shop_columns', function () {
+    return max( 1, (int) get_theme_mod( 'ecm_shop_columns', 3 ) );
+}, 20 );
+add_filter( 'loop_shop_per_page', function () {
+    return max( 1, (int) get_theme_mod( 'ecm_shop_per_page', 12 ) );
+}, 20 );
+
+// ── إعدادات عرض المتجر في التخصيص (Customizer) ────────────────
+add_action( 'customize_register', function ( $wp_customize ) {
+    $wp_customize->add_section( 'ecm_shop', [
+        'title'    => __( '🛒 عرض المتجر', 'ecm-theme' ),
+        'priority' => 162,
+    ] );
+
+    $wp_customize->add_setting( 'ecm_shop_columns', [
+        'default'           => 3,
+        'sanitize_callback' => 'absint',
+        'transport'         => 'refresh',
+    ] );
+    $wp_customize->add_control( 'ecm_shop_columns', [
+        'label'   => __( 'عدد المنتجات في الصف', 'ecm-theme' ),
+        'section' => 'ecm_shop',
+        'type'    => 'select',
+        'choices' => [ '1' => '1', '2' => '2', '3' => '3', '4' => '4', '5' => '5' ],
+    ] );
+
+    $wp_customize->add_setting( 'ecm_shop_per_page', [
+        'default'           => 12,
+        'sanitize_callback' => 'absint',
+        'transport'         => 'refresh',
+    ] );
+    $wp_customize->add_control( 'ecm_shop_per_page', [
+        'label'       => __( 'عدد المنتجات في الصفحة', 'ecm-theme' ),
+        'section'     => 'ecm_shop',
+        'type'        => 'number',
+        'input_attrs' => [ 'min' => 1, 'max' => 48, 'step' => 1 ],
+    ] );
+
+    $wp_customize->add_setting( 'ecm_shop_img_ratio', [
+        'default'           => 'square',
+        'sanitize_callback' => 'sanitize_text_field',
+        'transport'         => 'refresh',
+    ] );
+    $wp_customize->add_control( 'ecm_shop_img_ratio', [
+        'label'   => __( 'شكل صورة المنتج', 'ecm-theme' ),
+        'section' => 'ecm_shop',
+        'type'    => 'select',
+        'choices' => [
+            'square'    => __( 'مربّعة (1:1)', 'ecm-theme' ),
+            'portrait'  => __( 'طولية (3:4)', 'ecm-theme' ),
+            'landscape' => __( 'عرضية (4:3)', 'ecm-theme' ),
+            'natural'   => __( 'الحجم الطبيعي', 'ecm-theme' ),
+        ],
+    ] );
+} );
+
+// ── يطبّق نسبة الصورة المختارة على شبكة المنتجات ───────────────
+add_action( 'wp_head', function () {
+    if ( ! function_exists( 'is_woocommerce' ) ) {
+        return;
+    }
+    $ratio = get_theme_mod( 'ecm_shop_img_ratio', 'square' );
+    $map   = [ 'square' => '1 / 1', 'portrait' => '3 / 4', 'landscape' => '4 / 3' ];
+    if ( 'natural' === $ratio ) {
+        echo '<style>.woocommerce ul.products li.product a img{aspect-ratio:auto !important;object-fit:contain !important;}</style>';
+    } elseif ( isset( $map[ $ratio ] ) ) {
+        echo '<style>.woocommerce ul.products li.product a img{aspect-ratio:' . esc_html( $map[ $ratio ] ) . ' !important;object-fit:cover !important;}</style>';
+    }
+}, 99 );
 
 // ── شريط بحث المنتجات فوق المتجر ──────────────────────────────
 add_action( 'woocommerce_before_shop_loop', 'ecm_shop_search_bar', 4 );
