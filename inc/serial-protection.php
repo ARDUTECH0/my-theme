@@ -276,6 +276,7 @@ function ecm_serials_api_page() {
             <h3>🎬 <?php esc_html_e( 'منتجات العميل (حسب سيريال جهازه · GET)', 'ecm-theme' ); ?></h3>
             <code>GET <?php echo esc_html( $api_base ); ?>/app/products?token=USER_TOKEN&amp;serial=ECM-0001</code>
             <code style="background:#eef7ee;">يرجّع: products[] (product_id · name · download_url · image · expires)</code>
+            <code style="color:#1a7f37;">download_url = رابط جاهز، الضغط عليه يُنزّل الملف مباشرة (بتوكن العميل — من غير تسجيل دخول بالمتصفح)</code>
             <code style="color:#646970;">لو الجهاز مش مسجّل للعميل → ok:false</code>
         </div>
     </div>
@@ -1423,24 +1424,34 @@ function ecm_rest_app_products( $request ) {
         }
     }
 
-    // المنتجات الرقمية اللي اشتراها (Downloads)
+    // المنتجات اللي اشتراها العميل فعلًا (من طلباته المكتملة/قيد التنفيذ) فقط
     $products = [];
-    if ( function_exists( 'wc_get_customer_available_downloads' ) ) {
-        $downloads = wc_get_customer_available_downloads( $user->ID );
-        $seen      = [];
-        foreach ( $downloads as $d ) {
-            $pid = (int) ( $d['product_id'] ?? 0 );
-            if ( $pid && isset( $seen[ $pid ] ) ) {
-                continue;
+    $seen     = [];
+    if ( function_exists( 'wc_get_orders' ) ) {
+        $orders = wc_get_orders( [
+            'customer_id' => $user->ID,
+            'status'      => [ 'completed', 'processing' ],
+            'limit'       => -1,
+        ] );
+        foreach ( $orders as $order ) {
+            foreach ( $order->get_items() as $item ) {
+                $pid = (int) $item->get_product_id();
+                if ( ! $pid || isset( $seen[ $pid ] ) ) {
+                    continue;
+                }
+                $seen[ $pid ] = 1;
+                $product      = $item->get_product();
+                $downloadable = $product && $product->is_downloadable();
+                $products[]   = [
+                    'product_id'   => $pid,
+                    'name'         => $item->get_name(),
+                    'image'        => get_the_post_thumbnail_url( $pid, 'medium' ) ?: '',
+                    // رابط تنزيل مباشر (للمنتجات الرقمية فقط)
+                    'download_url' => $downloadable ? ecm_app_download_url( $token, $pid ) : '',
+                    'downloadable' => (bool) $downloadable,
+                    'order_date'   => $order->get_date_created() ? $order->get_date_created()->date( 'Y-m-d' ) : '',
+                ];
             }
-            $seen[ $pid ] = 1;
-            $products[] = [
-                'product_id'   => $pid,
-                'name'         => $d['product_name'] ?? '',
-                'download_url' => $d['download_url'] ?? '',
-                'image'        => $pid ? ( get_the_post_thumbnail_url( $pid, 'medium' ) ?: '' ) : '',
-                'expires'      => ! empty( $d['access_expires'] ) ? date_i18n( 'Y-m-d', is_numeric( $d['access_expires'] ) ? (int) $d['access_expires'] : strtotime( $d['access_expires'] ) ) : '',
-            ];
         }
     }
 
@@ -1451,3 +1462,78 @@ function ecm_rest_app_products( $request ) {
         'products' => $products,
     ] );
 }
+
+/** رابط تنزيل مباشر جاهز (بتوكن العميل) */
+function ecm_app_download_url( string $token, int $product_id ): string {
+    return add_query_arg(
+        [ 'ecm_dl' => 1, 'token' => rawurlencode( $token ), 'product' => $product_id ],
+        home_url( '/' )
+    );
+}
+
+/** معالج التنزيل المباشر: يتحقق من التوكن ويبعت الملف */
+add_action( 'template_redirect', function () {
+    if ( empty( $_GET['ecm_dl'] ) ) {
+        return;
+    }
+    $token = isset( $_GET['token'] ) ? sanitize_text_field( wp_unslash( $_GET['token'] ) ) : '';
+    $pid   = isset( $_GET['product'] ) ? (int) $_GET['product'] : 0;
+
+    $user = ecm_user_from_app_token( $token );
+    if ( ! $user ) {
+        wp_die( esc_html__( 'توكن غير صالح.', 'ecm-theme' ), '', [ 'response' => 403 ] );
+    }
+    if ( ! function_exists( 'wc_get_product' ) ) {
+        wp_die( 'WooCommerce غير مفعّل', '', [ 'response' => 500 ] );
+    }
+    // لازم يكون اشترى المنتج فعلًا
+    if ( ! function_exists( 'wc_customer_bought_product' ) ||
+        ! wc_customer_bought_product( $user->user_email, $user->ID, $pid ) ) {
+        wp_die( esc_html__( 'غير مصرّح بتحميل هذا المنتج.', 'ecm-theme' ), '', [ 'response' => 403 ] );
+    }
+
+    $product = wc_get_product( $pid );
+    if ( ! $product ) {
+        wp_die( esc_html__( 'المنتج غير موجود.', 'ecm-theme' ), '', [ 'response' => 404 ] );
+    }
+    $downloads = $product->get_downloads();
+    if ( empty( $downloads ) ) {
+        wp_die( esc_html__( 'لا يوجد ملف للتحميل.', 'ecm-theme' ), '', [ 'response' => 404 ] );
+    }
+
+    /** @var WC_Product_Download $dl */
+    $dl   = reset( $downloads );
+    $file = $dl->get_file();
+
+    // حوّل رابط الملف لمسار على السيرفر
+    $upload = wp_upload_dir();
+    $path   = '';
+    if ( 0 === strpos( $file, $upload['baseurl'] ) ) {
+        $path = $upload['basedir'] . substr( $file, strlen( $upload['baseurl'] ) );
+    } elseif ( 0 === strpos( $file, '/' ) && file_exists( $file ) ) {
+        $path = $file;
+    } elseif ( file_exists( ABSPATH . ltrim( str_replace( site_url( '/' ), '', $file ), '/' ) ) ) {
+        $path = ABSPATH . ltrim( str_replace( site_url( '/' ), '', $file ), '/' );
+    }
+
+    if ( $path && file_exists( $path ) ) {
+        $name = $dl->get_name() ? $dl->get_name() : basename( $path );
+        if ( ! pathinfo( $name, PATHINFO_EXTENSION ) ) {
+            $name .= '.' . pathinfo( $path, PATHINFO_EXTENSION );
+        }
+        nocache_headers();
+        header( 'Content-Type: application/octet-stream' );
+        header( 'Content-Disposition: attachment; filename="' . sanitize_file_name( $name ) . '"' );
+        header( 'Content-Length: ' . filesize( $path ) );
+        header( 'X-Content-Type-Options: nosniff' );
+        while ( ob_get_level() ) {
+            ob_end_clean();
+        }
+        readfile( $path );
+        exit;
+    }
+
+    // ملف خارجي (URL) → تحويل مباشر
+    wp_redirect( esc_url_raw( $file ) );
+    exit;
+} );
