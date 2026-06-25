@@ -1369,6 +1369,12 @@ add_action( 'rest_api_init', function () {
         'callback'            => 'ecm_rest_app_products',
         'permission_callback' => '__return_true',
     ] );
+    // تنزيل ملف منتج (بتوكن العميل)
+    register_rest_route( 'ecm/v1', '/app/download', [
+        'methods'             => 'GET',
+        'callback'            => 'ecm_rest_app_download',
+        'permission_callback' => '__return_true',
+    ] );
 } );
 
 /** دخول العميل (أي مستخدم) → توكن خاص بيه */
@@ -1450,58 +1456,71 @@ function ecm_rest_app_products( $request ) {
     ] );
 }
 
-/** رابط تنزيل مباشر جاهز (بتوكن العميل) */
+/** رابط تنزيل مباشر جاهز (REST + توكن العميل) */
 function ecm_app_download_url( string $token, int $product_id ): string {
     return add_query_arg(
-        [ 'ecm_dl' => 1, 'token' => rawurlencode( $token ), 'product' => $product_id ],
-        home_url( '/' )
+        [ 'token' => rawurlencode( $token ), 'product' => $product_id ],
+        rest_url( 'ecm/v1/app/download' )
     );
 }
 
-/** معالج التنزيل المباشر: يتحقق من التوكن ويبعت الملف */
-add_action( 'template_redirect', function () {
-    if ( empty( $_GET['ecm_dl'] ) ) {
-        return;
+/** يحوّل رابط/مسار ملف الووكومرس لمسار حقيقي على السيرفر (يتجاهل http/https) */
+function ecm_resolve_download_path( string $file ): string {
+    $upload  = wp_upload_dir();
+    $noproto = function ( $u ) { return preg_replace( '#^https?://#i', '', (string) $u ); };
+
+    $file_n = $noproto( $file );
+    $base_n = $noproto( $upload['baseurl'] );
+    if ( '' !== $base_n && 0 === strpos( $file_n, $base_n ) ) {
+        $candidate = $upload['basedir'] . substr( $file_n, strlen( $base_n ) );
+        if ( file_exists( $candidate ) ) {
+            return $candidate;
+        }
     }
-    $token = isset( $_GET['token'] ) ? sanitize_text_field( wp_unslash( $_GET['token'] ) ) : '';
-    $pid   = isset( $_GET['product'] ) ? (int) $_GET['product'] : 0;
+    // مسار مطلق على السيرفر
+    if ( ( 0 === strpos( $file, '/' ) || preg_match( '#^[A-Za-z]:[\\\\/]#', $file ) ) && file_exists( $file ) ) {
+        return $file;
+    }
+    // نسبي لجذر الموقع
+    $site_n = $noproto( site_url( '/' ) );
+    if ( 0 === strpos( $file_n, $site_n ) ) {
+        $candidate = ABSPATH . ltrim( substr( $file_n, strlen( $site_n ) ), '/' );
+        if ( file_exists( $candidate ) ) {
+            return $candidate;
+        }
+    }
+    return '';
+}
+
+/** REST: تنزيل ملف المنتج بتوكن العميل */
+function ecm_rest_app_download( $request ) {
+    $token = sanitize_text_field( (string) $request->get_param( 'token' ) );
+    $pid   = (int) $request->get_param( 'product' );
 
     $user = ecm_user_from_app_token( $token );
     if ( ! $user ) {
-        wp_die( esc_html__( 'توكن غير صالح.', 'ecm-theme' ), '', [ 'response' => 403 ] );
+        return new WP_Error( 'ecm_unauth', 'توكن غير صالح', [ 'status' => 401 ] );
     }
     if ( ! function_exists( 'wc_get_product' ) ) {
-        wp_die( 'WooCommerce غير مفعّل', '', [ 'response' => 500 ] );
+        return new WP_Error( 'ecm_nowc', 'WooCommerce غير مفعّل', [ 'status' => 500 ] );
     }
-    // لازم يكون اشترى المنتج فعلًا
     if ( ! function_exists( 'wc_customer_bought_product' ) ||
         ! wc_customer_bought_product( $user->user_email, $user->ID, $pid ) ) {
-        wp_die( esc_html__( 'غير مصرّح بتحميل هذا المنتج.', 'ecm-theme' ), '', [ 'response' => 403 ] );
+        return new WP_Error( 'ecm_forbidden', 'غير مصرّح بتحميل هذا المنتج', [ 'status' => 403 ] );
     }
-
     $product = wc_get_product( $pid );
     if ( ! $product ) {
-        wp_die( esc_html__( 'المنتج غير موجود.', 'ecm-theme' ), '', [ 'response' => 404 ] );
+        return new WP_Error( 'ecm_notfound', 'المنتج غير موجود', [ 'status' => 404 ] );
     }
     $downloads = $product->get_downloads();
     if ( empty( $downloads ) ) {
-        wp_die( esc_html__( 'لا يوجد ملف للتحميل.', 'ecm-theme' ), '', [ 'response' => 404 ] );
+        return new WP_Error( 'ecm_nofile', 'لا يوجد ملف مرفوع لهذا المنتج', [ 'status' => 404 ] );
     }
 
     /** @var WC_Product_Download $dl */
     $dl   = reset( $downloads );
     $file = $dl->get_file();
-
-    // حوّل رابط الملف لمسار على السيرفر
-    $upload = wp_upload_dir();
-    $path   = '';
-    if ( 0 === strpos( $file, $upload['baseurl'] ) ) {
-        $path = $upload['basedir'] . substr( $file, strlen( $upload['baseurl'] ) );
-    } elseif ( 0 === strpos( $file, '/' ) && file_exists( $file ) ) {
-        $path = $file;
-    } elseif ( file_exists( ABSPATH . ltrim( str_replace( site_url( '/' ), '', $file ), '/' ) ) ) {
-        $path = ABSPATH . ltrim( str_replace( site_url( '/' ), '', $file ), '/' );
-    }
+    $path = ecm_resolve_download_path( $file );
 
     if ( $path && file_exists( $path ) ) {
         $name = $dl->get_name() ? $dl->get_name() : basename( $path );
@@ -1520,7 +1539,11 @@ add_action( 'template_redirect', function () {
         exit;
     }
 
-    // ملف خارجي (URL) → تحويل مباشر
-    wp_redirect( esc_url_raw( $file ) );
-    exit;
-} );
+    // ملف مخزّن كرابط خارجي → تحويل مباشر
+    if ( filter_var( $file, FILTER_VALIDATE_URL ) ) {
+        wp_redirect( esc_url_raw( $file ) );
+        exit;
+    }
+
+    return new WP_Error( 'ecm_nofile', 'تعذّر الوصول لملف المنتج', [ 'status' => 404 ] );
+}
