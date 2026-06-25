@@ -1464,6 +1464,17 @@ function ecm_app_download_url( string $token, int $product_id ): string {
     );
 }
 
+/** توافق مع الروابط القديمة (?ecm_dl=1) → تحويل للـ REST الجديد */
+add_action( 'template_redirect', function () {
+    if ( empty( $_GET['ecm_dl'] ) ) {
+        return;
+    }
+    $token = isset( $_GET['token'] ) ? sanitize_text_field( wp_unslash( $_GET['token'] ) ) : '';
+    $pid   = isset( $_GET['product'] ) ? (int) $_GET['product'] : 0;
+    wp_redirect( ecm_app_download_url( $token, $pid ) );
+    exit;
+}, 1 );
+
 /** يحوّل رابط/مسار ملف الووكومرس لمسار حقيقي على السيرفر (يتجاهل http/https) */
 function ecm_resolve_download_path( string $file ): string {
     $upload  = wp_upload_dir();
