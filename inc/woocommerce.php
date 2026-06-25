@@ -32,6 +32,28 @@ add_action( 'after_setup_theme', function () {
     // ملاحظة: شيلنا دعم الـ slider عشان الصورة تظهر دايمًا بثبات (من غير flexslider)
 } );
 
+// ── السماح برفع ملفات المنتجات الرقمية (.ecm / .bin / .firmware) للأدمن ──
+add_filter( 'upload_mimes', function ( $mimes ) {
+    if ( current_user_can( 'manage_options' ) ) {
+        $mimes['ecm']      = 'application/octet-stream';
+        $mimes['bin']      = 'application/octet-stream';
+        $mimes['firmware'] = 'application/octet-stream';
+    }
+    return $mimes;
+} );
+
+// تجاوز فحص «نوع الملف الحقيقي» للامتدادات المخصّصة (وإلا ووردبريس يرفضها)
+add_filter( 'wp_check_filetype_and_ext', function ( $data, $file, $filename, $mimes ) {
+    if ( empty( $data['type'] ) ) {
+        $ext = strtolower( pathinfo( $filename, PATHINFO_EXTENSION ) );
+        if ( in_array( $ext, [ 'ecm', 'bin', 'firmware' ], true ) && current_user_can( 'manage_options' ) ) {
+            $data['ext']  = $ext;
+            $data['type'] = 'application/octet-stream';
+        }
+    }
+    return $data;
+}, 10, 4 );
+
 // ── إزالة الشريط الجانبي للمتجر (تصميم عرض كامل) ──────────────
 remove_action( 'woocommerce_sidebar', 'woocommerce_get_sidebar', 10 );
 
