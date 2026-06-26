@@ -281,7 +281,7 @@ function ecm_serials_api_page() {
 
             <h3>🛍️ <?php esc_html_e( 'كتالوج المنتجات للشراء (GET)', 'ecm-theme' ); ?></h3>
             <code>GET <?php echo esc_html( $api_base ); ?>/app/catalog?token=USER_TOKEN&amp;search=&amp;limit=50</code>
-            <code style="background:#eef7ee;">يرجّع: products[] (product_id · name · price · price_html · currency · on_sale · image · description · buy_url)</code>
+            <code style="background:#eef7ee;">يرجّع: products[] (product_id · name · price · currency · image · app_image · gallery[] · description · documentation · buy_url)</code>
             <code style="color:#1a7f37;">buy_url = رابط شراء سريع، الضغط عليه يضيف المنتج للسلة ويفتح الدفع مباشرة (ويسجّل دخول العميل بالتوكن)</code>
         </div>
     </div>
@@ -1434,7 +1434,11 @@ function ecm_rest_app_catalog( $request ) {
             'image'       => $img ?: '',
             // صورة خاصة بالتطبيق (جودة عالية) — أو صورة الموقع لو مش متحطّة
             'app_image'   => function_exists( 'ecm_product_app_image' ) ? ecm_product_app_image( $p->get_id() ) : ( $img ?: '' ),
+            // كل صور المعرض بجودة عالية
+            'gallery'     => function_exists( 'ecm_product_gallery_images' ) ? ecm_product_gallery_images( $p->get_id() ) : [],
             'description' => wp_strip_all_tags( $p->get_short_description() ?: $p->get_description() ),
+            // الشرح (HTML — يدعم فيديوهات)
+            'documentation' => function_exists( 'ecm_product_doc_html' ) ? ecm_product_doc_html( $p->get_id() ) : '',
             'permalink'   => get_permalink( $p->get_id() ),
             // رابط الشراء السريع → تشيك‌اوت مباشرة بالمنتج
             'buy_url'     => ecm_app_buy_url( $p->get_id(), $token ),
@@ -1538,7 +1542,9 @@ function ecm_rest_app_products( $request ) {
                     'name'         => $item->get_name(),
                     'image'        => get_the_post_thumbnail_url( $pid, 'medium' ) ?: '',
                     'app_image'    => function_exists( 'ecm_product_app_image' ) ? ecm_product_app_image( $pid ) : '',
+                    'gallery'      => function_exists( 'ecm_product_gallery_images' ) ? ecm_product_gallery_images( $pid ) : [],
                     'description'  => $product ? wp_strip_all_tags( $product->get_short_description() ?: $product->get_description() ) : '',
+                    'documentation'=> function_exists( 'ecm_product_doc_html' ) ? ecm_product_doc_html( $pid ) : '',
                     // رابط تنزيل مباشر (للمنتجات الرقمية فقط)
                     'download_url' => $downloadable ? ecm_app_download_url( $token, $pid ) : '',
                     'downloadable' => (bool) $downloadable,

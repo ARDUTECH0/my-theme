@@ -22,6 +22,34 @@ function ecm_product_app_image( int $product_id ): string {
     return get_the_post_thumbnail_url( $product_id, 'large' ) ?: '';
 }
 
+/** كل صور المعرض (gallery) بجودة عالية — الصورة الرئيسية أولًا */
+function ecm_product_gallery_images( int $product_id ): array {
+    $product = function_exists( 'wc_get_product' ) ? wc_get_product( $product_id ) : null;
+    if ( ! $product ) {
+        return [];
+    }
+    $urls = [];
+    if ( $product->get_image_id() ) {
+        $u = wp_get_attachment_image_url( $product->get_image_id(), 'full' );
+        if ( $u ) {
+            $urls[] = $u;
+        }
+    }
+    foreach ( $product->get_gallery_image_ids() as $gid ) {
+        $u = wp_get_attachment_image_url( $gid, 'full' );
+        if ( $u && ! in_array( $u, $urls, true ) ) {
+            $urls[] = $u;
+        }
+    }
+    return $urls;
+}
+
+/** شرح المنتج جاهز للعرض (HTML — الفيديوهات متحوّلة) */
+function ecm_product_doc_html( int $product_id ): string {
+    $doc = get_post_meta( $product_id, '_ecm_product_doc', true );
+    return $doc ? apply_filters( 'the_content', $doc ) : '';
+}
+
 // ── ميتا بوكس في صفحة تعديل المنتج ────────────────────────────
 add_action( 'add_meta_boxes', function () {
     add_meta_box( 'ecm_product_fields', '📱 ' . __( 'إعدادات ECM — صورة التطبيق + الشرح', 'ecm-theme' ), 'ecm_product_fields_box', 'product', 'normal', 'high' );
