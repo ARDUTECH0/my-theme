@@ -16,6 +16,68 @@ function ecm_smtp_opts(): array {
     return is_array( $o ) ? $o : [];
 }
 
+/** آخر حالة اتصال محفوظة ['ok'=>bool,'msg'=>string,'time'=>int] */
+function ecm_smtp_status(): array {
+    $s = get_option( 'ecm_smtp_status', [] );
+    return is_array( $s ) ? $s : [];
+}
+
+/**
+ * اختبار الاتصال الحقيقي بسيرفر SMTP (يتصل + يعمل Authentication بدون إرسال).
+ * بيرجّع ['ok'=>bool,'msg'=>string] وبيحفظ الحالة.
+ */
+function ecm_smtp_test_connection(): array {
+    $o = ecm_smtp_opts();
+    if ( empty( $o['host'] ) ) {
+        return [ 'ok' => false, 'msg' => 'مفيش خادم (Host) متحدّد.' ];
+    }
+
+    // تحميل PHPMailer بتاع ووردبريس
+    if ( ! class_exists( '\PHPMailer\PHPMailer\PHPMailer' ) ) {
+        require_once ABSPATH . WPINC . '/PHPMailer/PHPMailer.php';
+        require_once ABSPATH . WPINC . '/PHPMailer/SMTP.php';
+        require_once ABSPATH . WPINC . '/PHPMailer/Exception.php';
+    }
+
+    $mail = new \PHPMailer\PHPMailer\PHPMailer( true );
+    $mail->isSMTP();
+    $mail->Host    = $o['host'];
+    $mail->Port    = (int) ( $o['port'] ?? 587 );
+    $mail->Timeout = 8;
+
+    $enc = $o['encryption'] ?? 'tls';
+    if ( 'none' !== $enc ) {
+        $mail->SMTPSecure = $enc;
+    } else {
+        $mail->SMTPSecure  = '';
+        $mail->SMTPAutoTLS = false;
+    }
+    if ( ! empty( $o['user'] ) ) {
+        $mail->SMTPAuth = true;
+        $mail->Username = $o['user'];
+        $mail->Password = $o['pass'] ?? '';
+    }
+
+    $result = [ 'ok' => false, 'msg' => '' ];
+    try {
+        if ( $mail->smtpConnect() ) {
+            $mail->getSMTPInstance()->quit();
+            $result = [ 'ok' => true, 'msg' => 'تم الاتصال والتحقق بنجاح ✅' ];
+        } else {
+            $result['msg'] = 'فشل الاتصال بالخادم.';
+        }
+    } catch ( \Throwable $e ) {
+        $result['msg'] = $e->getMessage();
+    }
+
+    update_option( 'ecm_smtp_status', [
+        'ok'   => $result['ok'],
+        'msg'  => $result['msg'],
+        'time' => time(),
+    ] );
+    return $result;
+}
+
 // ── توجيه ووردبريس لإرسال عبر SMTP ────────────────────────────
 add_action( 'phpmailer_init', function ( $phpmailer ) {
     $o = ecm_smtp_opts();
@@ -50,6 +112,22 @@ add_filter( 'wp_mail_from', function ( $email ) {
 add_filter( 'wp_mail_from_name', function ( $name ) {
     $o = ecm_smtp_opts();
     return ! empty( $o['from_name'] ) ? $o['from_name'] : $name;
+} );
+
+// ── ضمان تفعيل إيميلات ووكومرس المهمة (إعادة التعيين/حساب جديد) ─
+// ووكومرس بياخد مسار إعادة تعيين كلمة المرور؛ لو الإيميل متوقّف
+// مفيش رسالة بتتبعت. بنفعّلهم برمجيًا للتأكيد.
+add_filter( 'woocommerce_email_enabled_customer_reset_password', '__return_true', 99 );
+add_filter( 'woocommerce_email_enabled_customer_new_account', '__return_true', 99 );
+
+// ── تسجيل آخر خطأ بريد (للتشخيص) ──────────────────────────────
+add_action( 'wp_mail_failed', function ( $wp_error ) {
+    if ( is_wp_error( $wp_error ) ) {
+        update_option( 'ecm_mail_last_error', [
+            'msg'  => $wp_error->get_error_message(),
+            'time' => time(),
+        ], false );
+    }
 } );
 
 // ── صفحة الإعدادات في لوحة التحكم ─────────────────────────────
@@ -109,6 +187,7 @@ function ecm_smtp_page() {
         remove_action( 'wp_mail_failed', $cap );
 
         if ( $ok ) {
+            update_option( 'ecm_smtp_status', [ 'ok' => true, 'msg' => 'تم الإرسال بنجاح', 'time' => time() ] );
             $notice = '<div class="notice notice-success"><p>' . sprintf(
                 /* translators: %s: email */
                 esc_html__( 'تم إرسال إيميل تجريبي إلى %s — اتأكد إنه وصل (وبص في Spam).', 'ecm-theme' ),
@@ -117,6 +196,41 @@ function ecm_smtp_page() {
         } else {
             $notice = '<div class="notice notice-error"><p><strong>' . esc_html__( 'فشل الإرسال:', 'ecm-theme' ) . '</strong> ' . esc_html( $err ?: __( 'تأكد من بيانات SMTP.', 'ecm-theme' ) ) . '</p></div>';
         }
+    }
+
+    // ── اختبار الاتصال بالخادم (بدون إرسال) ──
+    if ( isset( $_POST['ecm_smtp_verify'] ) && check_admin_referer( 'ecm_smtp' ) ) {
+        $r = ecm_smtp_test_connection();
+        if ( $r['ok'] ) {
+            $notice = '<div class="notice notice-success"><p>🔌 <strong>' . esc_html__( 'الاتصال سليم:', 'ecm-theme' ) . '</strong> ' . esc_html( $r['msg'] ) . '</p></div>';
+        } else {
+            $notice = '<div class="notice notice-error"><p>🔌 <strong>' . esc_html__( 'فشل الاتصال:', 'ecm-theme' ) . '</strong> ' . esc_html( $r['msg'] ) . '</p></div>';
+        }
+    }
+
+    // ── شريط الحالة الحالية ──
+    $st = ecm_smtp_status();
+    if ( ! empty( $st ) ) {
+        $when    = ! empty( $st['time'] ) ? wp_date( 'Y-m-d H:i', (int) $st['time'] ) : '';
+        $is_ok   = ! empty( $st['ok'] );
+        $bg      = $is_ok ? '#e7f9e0' : '#ffe2e2';
+        $bd      = $is_ok ? '#9CFF00' : '#ffb0b0';
+        $label   = $is_ok ? '✅ ' . __( 'الإيميل متصل وشغّال', 'ecm-theme' ) : '⚠️ ' . __( 'الإيميل مش متصل', 'ecm-theme' );
+        $notice .= '<div style="background:' . $bg . ';border:1px solid ' . $bd . ';border-radius:10px;padding:12px 16px;margin:10px 0;">'
+            . '<strong>' . esc_html( $label ) . '</strong>'
+            . ( $when ? ' <span style="opacity:.7;">— ' . esc_html__( 'آخر فحص', 'ecm-theme' ) . ': ' . esc_html( $when ) . '</span>' : '' )
+            . '</div>';
+    }
+
+    // ── آخر خطأ بريد (لو فيه) ──
+    $last_err = get_option( 'ecm_mail_last_error', [] );
+    if ( ! empty( $last_err['msg'] ) ) {
+        $ewhen   = ! empty( $last_err['time'] ) ? wp_date( 'Y-m-d H:i', (int) $last_err['time'] ) : '';
+        $notice .= '<div style="background:#fff7e6;border:1px solid #ffd591;border-radius:10px;padding:12px 16px;margin:10px 0;">'
+            . '<strong>⚠️ ' . esc_html__( 'آخر فشل في إرسال بريد:', 'ecm-theme' ) . '</strong> '
+            . esc_html( $last_err['msg'] )
+            . ( $ewhen ? ' <span style="opacity:.7;">(' . esc_html( $ewhen ) . ')</span>' : '' )
+            . '</div>';
     }
 
     $o = ecm_smtp_opts();
@@ -185,7 +299,14 @@ function ecm_smtp_page() {
 
         <hr style="margin:24px 0;">
 
-        <h2>✉️ <?php esc_html_e( 'اختبار الإرسال', 'ecm-theme' ); ?></h2>
+        <h2>🔌 <?php esc_html_e( 'اختبار الاتصال', 'ecm-theme' ); ?></h2>
+        <form method="post" style="max-width:640px;">
+            <?php wp_nonce_field( 'ecm_smtp' ); ?>
+            <button type="submit" name="ecm_smtp_verify" value="1" class="button button-secondary"><?php esc_html_e( 'افحص الاتصال بالخادم', 'ecm-theme' ); ?></button>
+            <p class="description"><?php esc_html_e( 'بيتصل بسيرفر البريد ويتأكد من البيانات بدون ما يبعت إيميل.', 'ecm-theme' ); ?></p>
+        </form>
+
+        <h2 style="margin-top:22px;">✉️ <?php esc_html_e( 'اختبار الإرسال', 'ecm-theme' ); ?></h2>
         <form method="post" style="max-width:640px;">
             <?php wp_nonce_field( 'ecm_smtp' ); ?>
             <input name="test_to" type="email" class="regular-text" placeholder="<?php echo esc_attr( wp_get_current_user()->user_email ); ?>">
