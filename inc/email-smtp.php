@@ -104,9 +104,27 @@ add_action( 'phpmailer_init', function ( $phpmailer ) {
     }
 } );
 
-// ── ضبط عنوان واسم المُرسِل (مهم لتقليل السبام) ────────────────
+/** نفس الدومين؟ (للمقارنة بين المُرسِل وحساب SMTP) */
+function ecm_same_mail_domain( string $a, string $b ): bool {
+    $da = strtolower( substr( strrchr( $a, '@' ) ?: '', 1 ) );
+    $db = strtolower( substr( strrchr( $b, '@' ) ?: '', 1 ) );
+    return '' !== $da && $da === $db;
+}
+
+/**
+ * عنوان المُرسِل: لازم يكون نفس حساب الـ SMTP (السيرفر بيرفض غيره).
+ * لو حدّدت from_email على نفس دومين الحساب → بنسمح بيه، غير كده
+ * بنستخدم حساب SMTP نفسه عشان نتجنّب "Sender address rejected".
+ */
 add_filter( 'wp_mail_from', function ( $email ) {
-    $o = ecm_smtp_opts();
+    $o    = ecm_smtp_opts();
+    $user = $o['user'] ?? '';
+    if ( '' !== $user && is_email( $user ) ) {
+        if ( ! empty( $o['from_email'] ) && ecm_same_mail_domain( $o['from_email'], $user ) ) {
+            return $o['from_email'];
+        }
+        return $user; // أأمن خيار — يطابق الحساب المُصادَق عليه
+    }
     return ! empty( $o['from_email'] ) ? $o['from_email'] : $email;
 } );
 add_filter( 'wp_mail_from_name', function ( $name ) {
@@ -129,6 +147,25 @@ add_action( 'wp_mail_failed', function ( $wp_error ) {
         ], false );
     }
 } );
+
+// ── سجل كل الرسائل الصادرة (يبيّن هل الريستارت بيتحاول إرساله) ─
+add_filter( 'wp_mail', function ( $atts ) {
+    $log = get_option( 'ecm_mail_log', [] );
+    if ( ! is_array( $log ) ) {
+        $log = [];
+    }
+    $to = $atts['to'] ?? '';
+    if ( is_array( $to ) ) {
+        $to = implode( ', ', $to );
+    }
+    array_unshift( $log, [
+        'time'    => time(),
+        'to'      => is_string( $to ) ? $to : '',
+        'subject' => $atts['subject'] ?? '',
+    ] );
+    update_option( 'ecm_mail_log', array_slice( $log, 0, 15 ), false );
+    return $atts;
+}, 1 );
 
 // ── صفحة الإعدادات في لوحة التحكم ─────────────────────────────
 add_action( 'admin_menu', function () {
@@ -188,6 +225,7 @@ function ecm_smtp_page() {
 
         if ( $ok ) {
             update_option( 'ecm_smtp_status', [ 'ok' => true, 'msg' => 'تم الإرسال بنجاح', 'time' => time() ] );
+            delete_option( 'ecm_mail_last_error' );
             $notice = '<div class="notice notice-success"><p>' . sprintf(
                 /* translators: %s: email */
                 esc_html__( 'تم إرسال إيميل تجريبي إلى %s — اتأكد إنه وصل (وبص في Spam).', 'ecm-theme' ),
@@ -195,6 +233,43 @@ function ecm_smtp_page() {
             ) . '</p></div>';
         } else {
             $notice = '<div class="notice notice-error"><p><strong>' . esc_html__( 'فشل الإرسال:', 'ecm-theme' ) . '</strong> ' . esc_html( $err ?: __( 'تأكد من بيانات SMTP.', 'ecm-theme' ) ) . '</p></div>';
+        }
+    }
+
+    // ── إرسال رابط إعادة تعيين كلمة المرور لأي عميل (تشخيص + حل بديل) ──
+    if ( isset( $_POST['ecm_send_reset'] ) && check_admin_referer( 'ecm_smtp' ) ) {
+        $who  = sanitize_text_field( wp_unslash( $_POST['reset_user'] ?? '' ) );
+        $user = is_email( $who ) ? get_user_by( 'email', $who ) : get_user_by( 'login', $who );
+
+        if ( ! $user ) {
+            $notice = '<div class="notice notice-error"><p>' . esc_html__( 'مفيش مستخدم بالإيميل/الاسم ده.', 'ecm-theme' ) . '</p></div>';
+        } else {
+            $key = get_password_reset_key( $user );
+            if ( is_wp_error( $key ) ) {
+                $notice = '<div class="notice notice-error"><p>' . esc_html( $key->get_error_message() ) . '</p></div>';
+            } else {
+                $reset_url = network_site_url( 'wp-login.php?action=rp&key=' . rawurlencode( $key ) . '&login=' . rawurlencode( $user->user_login ), 'login' );
+                $site      = wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
+                $msg       = "مرحبًا " . $user->display_name . "،\n\n"
+                    . "وصلنا طلب لإعادة تعيين كلمة المرور لحسابك في {$site}.\n"
+                    . "اضغط الرابط ده عشان تختار كلمة مرور جديدة:\n\n{$reset_url}\n\n"
+                    . "لو مش إنت اللي طلبت، تجاهل الرسالة دي.\n\n— {$site}";
+                $err = '';
+                $cap = function ( $e ) use ( &$err ) { $err = $e->get_error_message(); };
+                add_action( 'wp_mail_failed', $cap );
+                $ok = wp_mail( $user->user_email, "إعادة تعيين كلمة المرور — {$site}", $msg );
+                remove_action( 'wp_mail_failed', $cap );
+
+                if ( $ok ) {
+                    $notice = '<div class="notice notice-success"><p>' . sprintf(
+                        /* translators: %s: email */
+                        esc_html__( 'تم إرسال رابط إعادة التعيين إلى %s ✅', 'ecm-theme' ),
+                        esc_html( $user->user_email )
+                    ) . '</p></div>';
+                } else {
+                    $notice = '<div class="notice notice-error"><p><strong>' . esc_html__( 'فشل الإرسال:', 'ecm-theme' ) . '</strong> ' . esc_html( $err ?: __( 'تأكد من بيانات SMTP.', 'ecm-theme' ) ) . '</p></div>';
+                }
+            }
         }
     }
 
@@ -287,7 +362,12 @@ function ecm_smtp_page() {
                 </tr>
                 <tr>
                     <th scope="row"><label for="ecm-from-email"><?php esc_html_e( 'إيميل المُرسِل', 'ecm-theme' ); ?></label></th>
-                    <td><input name="from_email" id="ecm-from-email" type="email" class="regular-text" value="<?php echo $v( 'from_email', get_option( 'admin_email' ) ); ?>"></td>
+                    <td>
+                        <input name="from_email" id="ecm-from-email" type="email" class="regular-text" value="<?php echo $v( 'from_email', get_option( 'admin_email' ) ); ?>">
+                        <p class="description" style="color:#b45309;">
+                            ⚠️ <?php esc_html_e( 'لازم يكون نفس حساب SMTP (أو على نفس الدومين)، وإلا السيرفر بيرفض الإرسال. لو سيبته مختلف، هنستخدم حساب SMTP تلقائيًا.', 'ecm-theme' ); ?>
+                        </p>
+                    </td>
                 </tr>
                 <tr>
                     <th scope="row"><label for="ecm-from-name"><?php esc_html_e( 'اسم المُرسِل', 'ecm-theme' ); ?></label></th>
@@ -313,6 +393,42 @@ function ecm_smtp_page() {
             <button type="submit" name="ecm_smtp_test" value="1" class="button"><?php esc_html_e( 'ابعت إيميل تجريبي', 'ecm-theme' ); ?></button>
             <p class="description"><?php esc_html_e( 'احفظ الإعدادات الأول، بعدين جرّب الإرسال.', 'ecm-theme' ); ?></p>
         </form>
+
+        <hr style="margin:24px 0;">
+
+        <h2>🔑 <?php esc_html_e( 'إرسال رابط إعادة تعيين كلمة المرور', 'ecm-theme' ); ?></h2>
+        <form method="post" style="max-width:640px;">
+            <?php wp_nonce_field( 'ecm_smtp' ); ?>
+            <input name="reset_user" type="text" class="regular-text" placeholder="<?php esc_attr_e( 'إيميل أو اسم مستخدم العميل', 'ecm-theme' ); ?>" required>
+            <button type="submit" name="ecm_send_reset" value="1" class="button button-primary"><?php esc_html_e( 'ابعت رابط إعادة التعيين', 'ecm-theme' ); ?></button>
+            <p class="description"><?php esc_html_e( 'بيبعت رابط إعادة تعيين حقيقي للعميل — استخدمه لو العميل مش بيوصله الإيميل تلقائيًا.', 'ecm-theme' ); ?></p>
+        </form>
+
+        <hr style="margin:24px 0;">
+
+        <h2>📜 <?php esc_html_e( 'سجل آخر الرسائل', 'ecm-theme' ); ?></h2>
+        <?php $log = get_option( 'ecm_mail_log', [] ); ?>
+        <?php if ( empty( $log ) ) : ?>
+            <p class="description"><?php esc_html_e( 'لسه مفيش رسائل اتبعتت. اطلب إعادة تعيين الباسورد وارجع شوف هنا هل ظهرت محاولة ولا لأ.', 'ecm-theme' ); ?></p>
+        <?php else : ?>
+            <table class="widefat striped" style="max-width:760px;">
+                <thead><tr>
+                    <th><?php esc_html_e( 'الوقت', 'ecm-theme' ); ?></th>
+                    <th><?php esc_html_e( 'إلى', 'ecm-theme' ); ?></th>
+                    <th><?php esc_html_e( 'الموضوع', 'ecm-theme' ); ?></th>
+                </tr></thead>
+                <tbody>
+                <?php foreach ( $log as $row ) : ?>
+                    <tr>
+                        <td><?php echo esc_html( ! empty( $row['time'] ) ? wp_date( 'Y-m-d H:i', (int) $row['time'] ) : '' ); ?></td>
+                        <td><?php echo esc_html( $row['to'] ?? '' ); ?></td>
+                        <td><?php echo esc_html( $row['subject'] ?? '' ); ?></td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+            <p class="description"><?php esc_html_e( 'لو طلبت إعادة تعيين الباسورد ومظهرتش محاولة هنا → الوورد مش بيبعت الطلب أصلاً (مش مشكلة SMTP).', 'ecm-theme' ); ?></p>
+        <?php endif; ?>
 
         <hr style="margin:24px 0;">
         <h3>ℹ️ <?php esc_html_e( 'إعدادات Gmail الجاهزة', 'ecm-theme' ); ?></h3>
