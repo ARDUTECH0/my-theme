@@ -1617,6 +1617,35 @@ function ecm_rest_app_login( $request ) {
     if ( function_exists( 'ecm_login_clear' ) ) {
         ecm_login_clear();
     }
+
+    // ── ربط الحساب بجهاز واحد ────────────────────────────────
+    $device_id   = sanitize_text_field( (string) $request->get_param( 'device_id' ) );
+    $device_name = sanitize_text_field( (string) $request->get_param( 'device_name' ) );
+    if ( '' === $device_name ) {
+        $device_name = 'جهاز غير معروف';
+    }
+    if ( '' === $device_id ) {
+        return new WP_Error( 'ecm_no_device', 'حدّث التطبيق — لازم يبعت معرّف الجهاز (device_id)', [ 'status' => 400 ] );
+    }
+    if ( function_exists( 'ecm_app_bound_device' ) ) {
+        $bound = ecm_app_bound_device( $user->ID );
+        if ( ! empty( $bound['id'] ) ) {
+            // فيه جهاز مربوط — لازم يكون نفسه
+            if ( ! hash_equals( (string) $bound['id'], $device_id ) ) {
+                return new WP_Error(
+                    'ecm_device_locked',
+                    'الحساب ده مربوط بجهاز تاني. تواصل معانا عشان نفك الربط وتقدر تدخل من الجهاز ده.',
+                    [ 'status' => 403 ]
+                );
+            }
+        } else {
+            // أول دخول → اربط الجهاز
+            $ua = isset( $_SERVER['HTTP_USER_AGENT'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) : '';
+            $ip = function_exists( 'ecm_client_ip' ) ? ecm_client_ip() : '';
+            ecm_app_bind_device( $user->ID, $device_id, $device_name, $ip, $ua );
+        }
+    }
+
     $token = ecm_user_app_token( $user->ID );
 
     // أجهزته المسجّلة (سيريالات)
