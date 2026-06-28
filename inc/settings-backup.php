@@ -29,7 +29,80 @@ function ecm_backup_option_keys(): array {
     ];
 }
 
-/** يجمع كل بيانات النسخة الاحتياطية */
+/** سيريالات الأجهزة (كل الصفوف من الجدول) */
+function ecm_backup_collect_serials(): array {
+    if ( ! function_exists( 'ecm_serial_table' ) ) {
+        return [];
+    }
+    global $wpdb;
+    $table = ecm_serial_table();
+    if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) !== $table ) {
+        return [];
+    }
+    return $wpdb->get_results( "SELECT * FROM `{$table}`", ARRAY_A ) ?: []; // phpcs:ignore
+}
+
+/** ربط الأجهزة + توكنات التطبيق (مربوطة بالإيميل) */
+function ecm_backup_collect_user_app(): array {
+    $users = get_users( [
+        'meta_query'  => [
+            'relation' => 'OR',
+            [ 'key' => 'ecm_app_token', 'compare' => 'EXISTS' ],
+            [ 'key' => 'ecm_app_device', 'compare' => 'EXISTS' ],
+        ],
+        'number'      => 9999,
+        'count_total' => false,
+    ] );
+    $out = [];
+    foreach ( $users as $u ) {
+        $out[] = [
+            'email'  => $u->user_email,
+            'token'  => get_user_meta( $u->ID, 'ecm_app_token', true ),
+            'device' => get_user_meta( $u->ID, 'ecm_app_device', true ),
+        ];
+    }
+    return $out;
+}
+
+/** صفحات ECM (المحتوى + القالب + بيانات Elementor) */
+function ecm_backup_collect_pages(): array {
+    $titles = [];
+    if ( function_exists( 'ecm_get_expected_pages' ) ) {
+        foreach ( ecm_get_expected_pages() as $row ) {
+            $titles[] = $row[0];
+        }
+    }
+    $titles   = array_unique( array_merge( $titles, [ 'ECM Home' ] ) );
+    $meta_keys = [ '_wp_page_template', '_elementor_data', '_elementor_edit_mode',
+        '_elementor_version', '_elementor_template_type', '_elementor_page_settings' ];
+    $front_id = (int) get_option( 'page_on_front' );
+
+    $pages = [];
+    foreach ( $titles as $title ) {
+        $p = function_exists( 'ecm_page_by_title' ) ? ecm_page_by_title( $title ) : null;
+        if ( ! $p ) {
+            continue;
+        }
+        $meta = [];
+        foreach ( $meta_keys as $mk ) {
+            $mv = get_post_meta( $p->ID, $mk, true );
+            if ( '' !== $mv && null !== $mv ) {
+                $meta[ $mk ] = $mv;
+            }
+        }
+        $pages[] = [
+            'title'    => $p->post_title,
+            'name'     => $p->post_name,
+            'status'   => $p->post_status,
+            'content'  => $p->post_content,
+            'is_front' => ( $p->ID === $front_id ),
+            'meta'     => $meta,
+        ];
+    }
+    return $pages;
+}
+
+/** يجمع كل بيانات النسخة الاحتياطية الكاملة */
 function ecm_backup_collect(): array {
     $options = [];
     foreach ( ecm_backup_option_keys() as $k ) {
@@ -47,7 +120,102 @@ function ecm_backup_collect(): array {
         ],
         'options'    => $options,
         'theme_mods' => get_theme_mods() ?: [],
+        'serials'    => ecm_backup_collect_serials(),
+        'user_app'   => ecm_backup_collect_user_app(),
+        'pages'      => ecm_backup_collect_pages(),
     ];
+}
+
+/** استعادة سيريالات الأجهزة */
+function ecm_backup_restore_serials( array $rows ): int {
+    if ( empty( $rows ) || ! function_exists( 'ecm_serial_table' ) ) {
+        return 0;
+    }
+    global $wpdb;
+    $table = ecm_serial_table();
+    // اتأكد إن الجدول موجود
+    if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) !== $table
+        && function_exists( 'ecm_serials_install' ) ) {
+        delete_option( 'ecm_serials_db_v3' );
+        ecm_serials_install();
+    }
+    $cols = [ 'id', 'serial', 'status', 'user_id', 'email', 'token',
+        'warranty_months', 'free_all', 'activated_at', 'created_at' ];
+    $n = 0;
+    foreach ( $rows as $row ) {
+        if ( empty( $row['serial'] ) ) {
+            continue;
+        }
+        $clean = [];
+        foreach ( $cols as $c ) {
+            if ( array_key_exists( $c, $row ) ) {
+                $clean[ $c ] = $row[ $c ];
+            }
+        }
+        if ( $wpdb->replace( $table, $clean ) ) { // phpcs:ignore
+            $n++;
+        }
+    }
+    return $n;
+}
+
+/** استعادة ربط الأجهزة وتوكنات التطبيق */
+function ecm_backup_restore_user_app( array $list ): int {
+    $n = 0;
+    foreach ( $list as $row ) {
+        if ( empty( $row['email'] ) ) {
+            continue;
+        }
+        $u = get_user_by( 'email', $row['email'] );
+        if ( ! $u ) {
+            continue;
+        }
+        if ( ! empty( $row['token'] ) ) {
+            update_user_meta( $u->ID, 'ecm_app_token', $row['token'] );
+        }
+        if ( ! empty( $row['device'] ) && is_array( $row['device'] ) ) {
+            update_user_meta( $u->ID, 'ecm_app_device', $row['device'] );
+        }
+        $n++;
+    }
+    return $n;
+}
+
+/** استعادة صفحات ECM */
+function ecm_backup_restore_pages( array $pages ): int {
+    $n = 0;
+    foreach ( $pages as $pg ) {
+        if ( empty( $pg['title'] ) ) {
+            continue;
+        }
+        $existing = function_exists( 'ecm_page_by_title' ) ? ecm_page_by_title( $pg['title'] ) : null;
+        $postarr  = [
+            'post_title'   => $pg['title'],
+            'post_content' => $pg['content'] ?? '',
+            'post_status'  => $pg['status'] ?? 'publish',
+            'post_type'    => 'page',
+        ];
+        if ( $existing ) {
+            $postarr['ID'] = $existing->ID;
+            $pid = wp_update_post( $postarr );
+        } else {
+            $pid = wp_insert_post( $postarr );
+        }
+        if ( ! $pid || is_wp_error( $pid ) ) {
+            continue;
+        }
+        if ( ! empty( $pg['meta'] ) && is_array( $pg['meta'] ) ) {
+            foreach ( $pg['meta'] as $mk => $mv ) {
+                update_post_meta( $pid, $mk, $mv );
+            }
+        }
+        if ( ! empty( $pg['is_front'] ) ) {
+            update_option( 'show_on_front', 'page' );
+            update_option( 'page_on_front', $pid );
+        }
+        $n++;
+    }
+    return $n;
 }
 
 // ── تصدير: تنزيل ملف JSON ─────────────────────────────────────
@@ -86,7 +254,8 @@ add_action( 'admin_post_ecm_import_settings', function () {
     $raw  = file_get_contents( $_FILES['ecm_backup_file']['tmp_name'] ); // phpcs:ignore
     $data = json_decode( (string) $raw, true );
 
-    if ( ! is_array( $data ) || empty( $data['options'] ) && empty( $data['theme_mods'] ) ) {
+    if ( ! is_array( $data ) || ( empty( $data['options'] ) && empty( $data['theme_mods'] )
+        && empty( $data['serials'] ) && empty( $data['pages'] ) ) ) {
         wp_safe_redirect( add_query_arg( 'imported', 'bad', $redirect ) );
         exit;
     }
@@ -110,6 +279,17 @@ add_action( 'admin_post_ecm_import_settings', function () {
             set_theme_mod( $k, $v );
             $count++;
         }
+    }
+
+    // السيريالات + ربط الأجهزة + الصفحات
+    if ( ! empty( $data['serials'] ) && is_array( $data['serials'] ) ) {
+        $count += ecm_backup_restore_serials( $data['serials'] );
+    }
+    if ( ! empty( $data['user_app'] ) && is_array( $data['user_app'] ) ) {
+        $count += ecm_backup_restore_user_app( $data['user_app'] );
+    }
+    if ( ! empty( $data['pages'] ) && is_array( $data['pages'] ) ) {
+        $count += ecm_backup_restore_pages( $data['pages'] );
     }
 
     wp_safe_redirect( add_query_arg( 'imported', $count, $redirect ) );
@@ -161,9 +341,21 @@ function ecm_backup_page() {
             <?php endif; ?>
         <?php endif; ?>
 
-        <p class="description" style="max-width:760px;">
-            <?php esc_html_e( 'احفظ نسخة من كل إعداداتك (البريد، الألوان، التوكنات، إعدادات المتجر والمظهر) في ملف، وارجّعها وقت ما تحب.', 'ecm-theme' ); ?>
+        <p class="description" style="max-width:780px;">
+            <?php esc_html_e( 'نسخة كاملة من كل حاجة: السيريالات والأجهزة، إعدادات البريد والألوان والتوكنات، إعدادات المتجر والمظهر، وصفحات ECM (بمحتواها وقوالبها). نزّلها وارجّعها وقت ما تحب.', 'ecm-theme' ); ?>
         </p>
+
+        <div style="background:#f4f8f1;border:1px solid #e2ebdc;border-radius:12px;padding:14px 18px;max-width:780px;margin:8px 0 4px;">
+            <strong><?php esc_html_e( 'النسخة بتشمل:', 'ecm-theme' ); ?></strong>
+            <span style="color:#5a6160;">
+                🔑 <?php esc_html_e( 'السيريالات والأجهزة', 'ecm-theme' ); ?> ·
+                📧 <?php esc_html_e( 'البريد', 'ecm-theme' ); ?> ·
+                🎨 <?php esc_html_e( 'الألوان والمظهر', 'ecm-theme' ); ?> ·
+                🛒 <?php esc_html_e( 'المتجر', 'ecm-theme' ); ?> ·
+                📄 <?php esc_html_e( 'الصفحات', 'ecm-theme' ); ?> ·
+                🔗 <?php esc_html_e( 'ربط التطبيقات', 'ecm-theme' ); ?>
+            </span>
+        </div>
 
         <div class="ecm-bk-grid">
             <div class="ecm-bk-card">
