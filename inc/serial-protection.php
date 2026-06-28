@@ -128,18 +128,33 @@ function ecm_get_api_token(): string {
     return $t;
 }
 
-/** صلاحية الـ API: أدمن (كوكيز) أو توكن صحيح في الهيدر/الرابط */
+/** صلاحية الـ API: توكن صحيح، أو أدمن (كوكيز) + nonce صحيح (منع CSRF) */
 function ecm_api_auth(): bool {
-    if ( current_user_can( 'manage_woocommerce' ) ) {
-        return true;
-    }
+    // 1) توكن (للتطبيقات والسيرفر-تو-سيرفر) — مقارنة آمنة زمنيًا
     $token = '';
     if ( ! empty( $_SERVER['HTTP_X_ECM_TOKEN'] ) ) {
         $token = sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_ECM_TOKEN'] ) );
     } elseif ( isset( $_GET['api_key'] ) ) {
         $token = sanitize_text_field( wp_unslash( $_GET['api_key'] ) );
     }
-    return '' !== $token && hash_equals( ecm_get_api_token(), $token );
+    if ( '' !== $token && hash_equals( ecm_get_api_token(), $token ) ) {
+        return true;
+    }
+
+    // 2) أدمن داخل بالكوكيز — لكن لازم nonce صحيح (وإلا CSRF)
+    if ( current_user_can( 'manage_woocommerce' ) ) {
+        $nonce = '';
+        if ( ! empty( $_SERVER['HTTP_X_WP_NONCE'] ) ) {
+            $nonce = sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_WP_NONCE'] ) );
+        } elseif ( isset( $_REQUEST['_wpnonce'] ) ) {
+            $nonce = sanitize_text_field( wp_unslash( $_REQUEST['_wpnonce'] ) );
+        }
+        if ( $nonce && wp_verify_nonce( $nonce, 'wp_rest' ) ) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 function ecm_mask_email( string $email ): string {
@@ -1079,10 +1094,15 @@ function ecm_rest_login( $request ) {
     }
     $user = wp_authenticate( $username, $password );
     if ( is_wp_error( $user ) ) {
-        return new WP_Error( 'ecm_invalid', 'بيانات الدخول غير صحيحة', [ 'status' => 401 ] );
+        $msg = ( function_exists( 'ecm_login_blocked' ) && ecm_login_blocked() )
+            ? 'محاولات كتير — استنى شوية وحاول تاني' : 'بيانات الدخول غير صحيحة';
+        return new WP_Error( 'ecm_invalid', $msg, [ 'status' => 401 ] );
     }
     if ( ! user_can( $user, 'manage_woocommerce' ) ) {
         return new WP_Error( 'ecm_forbidden', 'الحساب ده مش مسموح له بالدخول', [ 'status' => 403 ] );
+    }
+    if ( function_exists( 'ecm_login_clear' ) ) {
+        ecm_login_clear();
     }
     return rest_ensure_response( [
         'ok'    => true,
@@ -1361,6 +1381,60 @@ function ecm_user_from_app_token( string $token ) {
     return $users ? $users[0] : null;
 }
 
+// ── روابط موقّعة تنتهي بعد مدة (للتنزيل/الشراء) ───────────────
+/** سرّ توقيع الروابط (يُنشأ مرة واحدة) */
+function ecm_link_secret(): string {
+    $s = get_option( 'ecm_link_secret' );
+    if ( ! $s ) {
+        $s = wp_generate_password( 64, true, true );
+        update_option( 'ecm_link_secret', $s, false );
+    }
+    return $s;
+}
+
+/**
+ * ينشئ توكن موقّع لإجراء محدد (dl/buy) ينتهي بعد $ttl ثانية.
+ * مربوط بتوكن المستخدم → لو غيّر توكنه تبطل كل روابطه القديمة.
+ */
+function ecm_sign_link( int $user_id, int $product_id, string $action, int $ttl ): string {
+    $exp  = time() + $ttl;
+    $data = $user_id . '|' . $product_id . '|' . $action . '|' . $exp;
+    $key  = ecm_link_secret() . '|' . ecm_user_app_token( $user_id );
+    $sig  = hash_hmac( 'sha256', $data, $key );
+    return rtrim( strtr( base64_encode( $data . '|' . $sig ), '+/', '-_' ), '=' );
+}
+
+/** يتحقق من توكن موقّع — يرجّع ['user_id','product_id'] أو null لو منتهي/مزوّر */
+function ecm_verify_link( string $sig_token, string $action ): ?array {
+    if ( '' === $sig_token ) {
+        return null;
+    }
+    $raw = base64_decode( strtr( $sig_token, '-_', '+/' ), true );
+    if ( false === $raw ) {
+        return null;
+    }
+    $parts = explode( '|', $raw );
+    if ( 5 !== count( $parts ) ) {
+        return null;
+    }
+    list( $uid, $pid, $act, $exp, $sig ) = $parts;
+    $uid = (int) $uid;
+    if ( $act !== $action || (int) $exp < time() ) {
+        return null; // إجراء مختلف أو انتهت صلاحيته
+    }
+    $user_token = (string) get_user_meta( $uid, 'ecm_app_token', true );
+    if ( '' === $user_token ) {
+        return null;
+    }
+    $data     = $uid . '|' . $pid . '|' . $act . '|' . $exp;
+    $key      = ecm_link_secret() . '|' . $user_token;
+    $expected = hash_hmac( 'sha256', $data, $key );
+    if ( ! hash_equals( $expected, (string) $sig ) ) {
+        return null;
+    }
+    return [ 'user_id' => $uid, 'product_id' => (int) $pid ];
+}
+
 add_action( 'rest_api_init', function () {
     // دخول العميل → يرجّع توكن المستخدم
     register_rest_route( 'ecm/v1', '/app/login', [
@@ -1388,11 +1462,11 @@ add_action( 'rest_api_init', function () {
     ] );
 } );
 
-/** رابط شراء سريع: يضيف المنتج للسلة ويودّي تشيك‌اوت (بتوكن العميل) */
-function ecm_app_buy_url( int $product_id, string $token = '' ): string {
+/** رابط شراء سريع: يضيف المنتج للسلة ويودّي تشيك‌اوت (رابط موقّع ينتهي بعد ساعة) */
+function ecm_app_buy_url( int $product_id, int $user_id = 0 ): string {
     $args = [ 'ecm_buy' => $product_id ];
-    if ( '' !== $token ) {
-        $args['token'] = rawurlencode( $token );
+    if ( $user_id ) {
+        $args['sig'] = ecm_sign_link( $user_id, $product_id, 'buy', HOUR_IN_SECONDS );
     }
     return add_query_arg( $args, home_url( '/' ) );
 }
@@ -1410,6 +1484,26 @@ function ecm_rest_app_catalog( $request ) {
     $user          = '' !== $token ? ecm_user_from_app_token( $token ) : null;
     $exclude_owned = 1 === (int) $request->get_param( 'exclude_owned' );
 
+    // مشتريات العميل دفعة واحدة (بدل استعلام لكل منتج)
+    $bought = [];
+    if ( $user && function_exists( 'wc_get_orders' ) ) {
+        $oids = wc_get_orders( [
+            'customer_id' => $user->ID,
+            'status'      => [ 'completed', 'processing' ],
+            'limit'       => -1,
+            'return'      => 'ids',
+        ] );
+        foreach ( $oids as $oid ) {
+            $o = wc_get_order( $oid );
+            if ( ! $o ) {
+                continue;
+            }
+            foreach ( $o->get_items() as $it ) {
+                $bought[ (int) $it->get_product_id() ] = true;
+            }
+        }
+    }
+
     $items = wc_get_products( [
         'status'  => 'publish',
         'limit'   => $limit,
@@ -1424,10 +1518,8 @@ function ecm_rest_app_catalog( $request ) {
             continue;
         }
 
-        // هل العميل مشترٍ المنتج ده؟
-        $owned = ( $user && function_exists( 'wc_customer_bought_product' ) )
-            ? wc_customer_bought_product( $user->user_email, $user->ID, $p->get_id() )
-            : false;
+        // هل العميل مشترٍ المنتج ده؟ (من الدفعة المحمّلة)
+        $owned = isset( $bought[ $p->get_id() ] );
         if ( $owned && $exclude_owned ) {
             continue; // إخفاء المنتجات المشتراة لو اتطلب
         }
@@ -1458,7 +1550,7 @@ function ecm_rest_app_catalog( $request ) {
             'owned'       => (bool) $owned,
             'permalink'   => get_permalink( $p->get_id() ),
             // رابط الشراء السريع → تشيك‌اوت مباشرة بالمنتج
-            'buy_url'     => ecm_app_buy_url( $p->get_id(), $token ),
+            'buy_url'     => ecm_app_buy_url( $p->get_id(), $user ? $user->ID : 0 ),
         ];
     }
 
@@ -1474,16 +1566,29 @@ add_action( 'template_redirect', function () {
     if ( empty( $_GET['ecm_buy'] ) ) {
         return;
     }
-    $pid   = (int) $_GET['ecm_buy'];
-    $token = isset( $_GET['token'] ) ? sanitize_text_field( wp_unslash( $_GET['token'] ) ) : '';
+    $pid  = (int) $_GET['ecm_buy'];
+    $user = null;
 
-    // سجّل دخول العميل بالتوكن (لو اتبعت) عشان التشيك‌اوت يبقى مربوط بحسابه
-    if ( '' !== $token && ! is_user_logged_in() ) {
-        $user = ecm_user_from_app_token( $token );
-        if ( $user ) {
-            wp_set_current_user( $user->ID );
-            wp_set_auth_cookie( $user->ID, true );
+    // رابط موقّع (الأساسي) — أو توكن خام (توافق قديم)
+    $sig = isset( $_GET['sig'] ) ? sanitize_text_field( wp_unslash( $_GET['sig'] ) ) : '';
+    if ( '' !== $sig ) {
+        $v = ecm_verify_link( $sig, 'buy' );
+        if ( $v ) {
+            $pid  = $v['product_id'];
+            $user = get_user_by( 'id', $v['user_id'] );
+        } elseif ( ! is_user_logged_in() ) {
+            // رابط منتهي → وديه لصفحة المنتج بدل تسجيل دخول صامت
+            wp_safe_redirect( get_permalink( $pid ) ?: home_url( '/' ) );
+            exit;
         }
+    } elseif ( isset( $_GET['token'] ) ) {
+        $user = ecm_user_from_app_token( sanitize_text_field( wp_unslash( $_GET['token'] ) ) );
+    }
+
+    // سجّل دخول العميل عشان التشيك‌اوت يبقى مربوط بحسابه
+    if ( $user && ! is_user_logged_in() ) {
+        wp_set_current_user( $user->ID );
+        wp_set_auth_cookie( $user->ID, true );
     }
 
     if ( ! function_exists( 'WC' ) || ! WC()->cart ) {
@@ -1505,7 +1610,12 @@ function ecm_rest_app_login( $request ) {
     }
     $user = wp_authenticate( $username, $password );
     if ( is_wp_error( $user ) ) {
-        return new WP_Error( 'ecm_invalid', 'بيانات الدخول غير صحيحة', [ 'status' => 401 ] );
+        $msg = ( function_exists( 'ecm_login_blocked' ) && ecm_login_blocked() )
+            ? 'محاولات كتير — استنى شوية وحاول تاني' : 'بيانات الدخول غير صحيحة';
+        return new WP_Error( 'ecm_invalid', $msg, [ 'status' => 401 ] );
+    }
+    if ( function_exists( 'ecm_login_clear' ) ) {
+        ecm_login_clear();
     }
     $token = ecm_user_app_token( $user->ID );
 
@@ -1564,7 +1674,7 @@ function ecm_rest_app_products( $request ) {
                     'full_description' => ( $product && $product->get_description() ) ? apply_filters( 'the_content', $product->get_description() ) : '',
                     'documentation'=> function_exists( 'ecm_product_doc_html' ) ? ecm_product_doc_html( $pid ) : '',
                     // رابط تنزيل مباشر (للمنتجات الرقمية فقط)
-                    'download_url' => $downloadable ? ecm_app_download_url( $token, $pid ) : '',
+                    'download_url' => $downloadable ? ecm_app_download_url( $user->ID, $pid ) : '',
                     'downloadable' => (bool) $downloadable,
                     'order_date'   => $order->get_date_created() ? $order->get_date_created()->date( 'Y-m-d' ) : '',
                 ];
@@ -1580,10 +1690,10 @@ function ecm_rest_app_products( $request ) {
     ] );
 }
 
-/** رابط تنزيل مباشر جاهز (REST + توكن العميل) */
-function ecm_app_download_url( string $token, int $product_id ): string {
+/** رابط تنزيل مباشر جاهز (REST + رابط موقّع ينتهي بعد 12 ساعة) */
+function ecm_app_download_url( int $user_id, int $product_id ): string {
     return add_query_arg(
-        [ 'token' => rawurlencode( $token ), 'product' => $product_id ],
+        [ 'sig' => ecm_sign_link( $user_id, $product_id, 'dl', 12 * HOUR_IN_SECONDS ) ],
         rest_url( 'ecm/v1/app/download' )
     );
 }
@@ -1595,7 +1705,12 @@ add_action( 'template_redirect', function () {
     }
     $token = isset( $_GET['token'] ) ? sanitize_text_field( wp_unslash( $_GET['token'] ) ) : '';
     $pid   = isset( $_GET['product'] ) ? (int) $_GET['product'] : 0;
-    wp_redirect( ecm_app_download_url( $token, $pid ) );
+    $user  = ecm_user_from_app_token( $token );
+    if ( $user ) {
+        wp_redirect( ecm_app_download_url( $user->ID, $pid ) );
+        exit;
+    }
+    wp_safe_redirect( home_url( '/' ) );
     exit;
 }, 1 );
 
@@ -1629,12 +1744,26 @@ function ecm_resolve_download_path( string $file ): string {
 
 /** REST: تنزيل ملف المنتج بتوكن العميل */
 function ecm_rest_app_download( $request ) {
-    $token = sanitize_text_field( (string) $request->get_param( 'token' ) );
-    $pid   = (int) $request->get_param( 'product' );
+    $user = null;
+    $pid  = 0;
 
-    $user = ecm_user_from_app_token( $token );
+    // رابط موقّع (الأساسي) — ينتهي بعد مدة
+    $sig = sanitize_text_field( (string) $request->get_param( 'sig' ) );
+    if ( '' !== $sig ) {
+        $v = ecm_verify_link( $sig, 'dl' );
+        if ( ! $v ) {
+            return new WP_Error( 'ecm_expired', 'انتهت صلاحية رابط التحميل — افتح المنتج تاني من التطبيق', [ 'status' => 403 ] );
+        }
+        $user = get_user_by( 'id', $v['user_id'] );
+        $pid  = $v['product_id'];
+    } else {
+        // توافق قديم: توكن خام
+        $user = ecm_user_from_app_token( sanitize_text_field( (string) $request->get_param( 'token' ) ) );
+        $pid  = (int) $request->get_param( 'product' );
+    }
+
     if ( ! $user ) {
-        return new WP_Error( 'ecm_unauth', 'توكن غير صالح', [ 'status' => 401 ] );
+        return new WP_Error( 'ecm_unauth', 'رابط غير صالح', [ 'status' => 401 ] );
     }
     if ( ! function_exists( 'wc_get_product' ) ) {
         return new WP_Error( 'ecm_nowc', 'WooCommerce غير مفعّل', [ 'status' => 500 ] );
