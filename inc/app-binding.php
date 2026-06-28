@@ -33,6 +33,13 @@ function ecm_app_unbind_device( int $user_id ): void {
     delete_user_meta( $user_id, 'ecm_app_token' ); // إبطال التوكن القديم فورًا
 }
 
+/** يولّد توكن جديد للمستخدم ويبطّل القديم (يُستدعى عند ربط جهاز جديد) */
+function ecm_app_regenerate_token( int $user_id ): string {
+    $t = wp_generate_password( 48, false );
+    update_user_meta( $user_id, 'ecm_app_token', $t );
+    return $t;
+}
+
 // ── صفحة الأدمن: الأجهزة المربوطة + فك الربط ──────────────────
 add_action( 'admin_menu', function () {
     add_submenu_page(

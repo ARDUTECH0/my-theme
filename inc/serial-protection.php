@@ -1639,10 +1639,13 @@ function ecm_rest_app_login( $request ) {
                 );
             }
         } else {
-            // أول دخول → اربط الجهاز
+            // أول دخول (أو بعد فك الربط) → اربط الجهاز + توكن جديد يلغي القديم
             $ua = isset( $_SERVER['HTTP_USER_AGENT'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) : '';
             $ip = function_exists( 'ecm_client_ip' ) ? ecm_client_ip() : '';
             ecm_app_bind_device( $user->ID, $device_id, $device_name, $ip, $ua );
+            if ( function_exists( 'ecm_app_regenerate_token' ) ) {
+                ecm_app_regenerate_token( $user->ID );
+            }
         }
     }
 
