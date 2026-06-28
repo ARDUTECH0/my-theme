@@ -376,7 +376,7 @@ add_action( 'wp_enqueue_scripts', 'ecm_enqueue_assets' );
 
 
 // ── THEME VERSION CONSTANT ───────────────────────────────────
-define( 'ECM_VERSION', '3.0.59' );
+define( 'ECM_VERSION', '3.0.60' );
 
 
 // ── INCLUDE: FRONT PAGE CUSTOMIZER ──────────────────────────
@@ -458,6 +458,9 @@ require_once get_template_directory() . '/inc/app-only-downloads.php';
 
 // ── INCLUDE: إعداد البريد (SMTP) ────────────────────────────
 require_once get_template_directory() . '/inc/email-smtp.php';
+
+// ── INCLUDE: تصميم إيميلات ووكومرس ──────────────────────────
+require_once get_template_directory() . '/inc/email-design.php';
 
 
 // ── ELEMENTOR PRO — THEME BUILDER LOCATIONS ──────────────────
