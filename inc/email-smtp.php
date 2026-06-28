@@ -102,6 +102,14 @@ add_action( 'phpmailer_init', function ( $phpmailer ) {
         $phpmailer->Username = $o['user'];
         $phpmailer->Password = $o['pass'] ?? '';
     }
+
+    // إجبار المُرسِل = حساب SMTP (بيتخطّى أي From بيحطّه ووكومرس/إضافات).
+    // ده آخر نقطة قبل الإرسال → بيضمن السيرفر ميرفضش الرسالة.
+    $from = ecm_smtp_from_address();
+    if ( $from && is_email( $from ) ) {
+        $phpmailer->From   = $from;
+        $phpmailer->Sender = $from; // Return-Path / envelope sender
+    }
 } );
 
 /** نفس الدومين؟ (للمقارنة بين المُرسِل وحساب SMTP) */
@@ -112,11 +120,10 @@ function ecm_same_mail_domain( string $a, string $b ): bool {
 }
 
 /**
- * عنوان المُرسِل: لازم يكون نفس حساب الـ SMTP (السيرفر بيرفض غيره).
- * لو حدّدت from_email على نفس دومين الحساب → بنسمح بيه، غير كده
- * بنستخدم حساب SMTP نفسه عشان نتجنّب "Sender address rejected".
+ * عنوان المُرسِل الصحيح: لازم يكون نفس حساب الـ SMTP (السيرفر بيرفض غيره).
+ * لو حدّدت from_email على نفس دومين الحساب → بنسمح بيه.
  */
-add_filter( 'wp_mail_from', function ( $email ) {
+function ecm_smtp_from_address(): string {
     $o    = ecm_smtp_opts();
     $user = $o['user'] ?? '';
     if ( '' !== $user && is_email( $user ) ) {
@@ -125,12 +132,27 @@ add_filter( 'wp_mail_from', function ( $email ) {
         }
         return $user; // أأمن خيار — يطابق الحساب المُصادَق عليه
     }
-    return ! empty( $o['from_email'] ) ? $o['from_email'] : $email;
+    return ! empty( $o['from_email'] ) ? $o['from_email'] : '';
+}
+
+// عنوان المُرسِل للكور
+add_filter( 'wp_mail_from', function ( $email ) {
+    $from = ecm_smtp_from_address();
+    return $from ?: $email;
 } );
+// عنوان المُرسِل لإيميلات ووكومرس (بتحطّه بنفسها فلازم نظبّطه هنا كمان)
+add_filter( 'woocommerce_email_from_address', function ( $email ) {
+    $from = ecm_smtp_from_address();
+    return $from ?: $email;
+}, 99 );
 add_filter( 'wp_mail_from_name', function ( $name ) {
     $o = ecm_smtp_opts();
     return ! empty( $o['from_name'] ) ? $o['from_name'] : $name;
 } );
+add_filter( 'woocommerce_email_from_name', function ( $name ) {
+    $o = ecm_smtp_opts();
+    return ! empty( $o['from_name'] ) ? $o['from_name'] : $name;
+}, 99 );
 
 // ── ضمان تفعيل إيميلات ووكومرس المهمة (إعادة التعيين/حساب جديد) ─
 // ووكومرس بياخد مسار إعادة تعيين كلمة المرور؛ لو الإيميل متوقّف
