@@ -1406,6 +1406,10 @@ function ecm_rest_app_catalog( $request ) {
     $search = sanitize_text_field( (string) $request->get_param( 'search' ) );
     $limit  = min( 100, max( 1, (int) ( $request->get_param( 'limit' ) ?: 50 ) ) );
 
+    // العميل (لو التوكن متبعت) + خيار إخفاء اللي اشتراه
+    $user          = '' !== $token ? ecm_user_from_app_token( $token ) : null;
+    $exclude_owned = 1 === (int) $request->get_param( 'exclude_owned' );
+
     $items = wc_get_products( [
         'status'  => 'publish',
         'limit'   => $limit,
@@ -1419,6 +1423,15 @@ function ecm_rest_app_catalog( $request ) {
         if ( ! $p->is_purchasable() && ! $p->is_type( 'variable' ) ) {
             continue;
         }
+
+        // هل العميل مشترٍ المنتج ده؟
+        $owned = ( $user && function_exists( 'wc_customer_bought_product' ) )
+            ? wc_customer_bought_product( $user->user_email, $user->ID, $p->get_id() )
+            : false;
+        if ( $owned && $exclude_owned ) {
+            continue; // إخفاء المنتجات المشتراة لو اتطلب
+        }
+
         $img = $p->get_image_id() ? wp_get_attachment_image_url( $p->get_image_id(), 'large' ) : '';
         if ( ! $img && function_exists( 'wc_placeholder_img_src' ) ) {
             $img = wc_placeholder_img_src();
@@ -1436,9 +1449,13 @@ function ecm_rest_app_catalog( $request ) {
             'app_image'   => function_exists( 'ecm_product_app_image' ) ? ecm_product_app_image( $p->get_id() ) : ( $img ?: '' ),
             // كل صور المعرض بجودة عالية
             'gallery'     => function_exists( 'ecm_product_gallery_images' ) ? ecm_product_gallery_images( $p->get_id() ) : [],
-            'description' => wp_strip_all_tags( $p->get_short_description() ?: $p->get_description() ),
+            // وصف مختصر + وصف كامل (HTML)
+            'description'      => wp_strip_all_tags( $p->get_short_description() ?: $p->get_description() ),
+            'full_description' => $p->get_description() ? apply_filters( 'the_content', $p->get_description() ) : '',
             // الشرح (HTML — يدعم فيديوهات)
             'documentation' => function_exists( 'ecm_product_doc_html' ) ? ecm_product_doc_html( $p->get_id() ) : '',
+            // هل العميل مشترٍ المنتج بالفعل؟
+            'owned'       => (bool) $owned,
             'permalink'   => get_permalink( $p->get_id() ),
             // رابط الشراء السريع → تشيك‌اوت مباشرة بالمنتج
             'buy_url'     => ecm_app_buy_url( $p->get_id(), $token ),
@@ -1544,6 +1561,7 @@ function ecm_rest_app_products( $request ) {
                     'app_image'    => function_exists( 'ecm_product_app_image' ) ? ecm_product_app_image( $pid ) : '',
                     'gallery'      => function_exists( 'ecm_product_gallery_images' ) ? ecm_product_gallery_images( $pid ) : [],
                     'description'  => $product ? wp_strip_all_tags( $product->get_short_description() ?: $product->get_description() ) : '',
+                    'full_description' => ( $product && $product->get_description() ) ? apply_filters( 'the_content', $product->get_description() ) : '',
                     'documentation'=> function_exists( 'ecm_product_doc_html' ) ? ecm_product_doc_html( $pid ) : '',
                     // رابط تنزيل مباشر (للمنتجات الرقمية فقط)
                     'download_url' => $downloadable ? ecm_app_download_url( $token, $pid ) : '',
