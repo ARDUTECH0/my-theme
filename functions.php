@@ -376,7 +376,7 @@ add_action( 'wp_enqueue_scripts', 'ecm_enqueue_assets' );
 
 
 // ── THEME VERSION CONSTANT ───────────────────────────────────
-define( 'ECM_VERSION', '3.0.66' );
+define( 'ECM_VERSION', '3.0.67' );
 
 
 // ── INCLUDE: FRONT PAGE CUSTOMIZER ──────────────────────────
@@ -452,6 +452,10 @@ require_once get_template_directory() . '/inc/serial-protection.php';
 
 // ── INCLUDE: ربط التطبيق بجهاز واحد ─────────────────────────
 require_once get_template_directory() . '/inc/app-binding.php';
+
+// ── INCLUDE: التحديث عن بُعد للأجهزة (OTA) ───────────────────
+require_once get_template_directory() . '/inc/ota-updates.php';
+require_once get_template_directory() . '/inc/ota-admin.php';
 
 // ── INCLUDE: التنزيل من التطبيق فقط ─────────────────────────
 require_once get_template_directory() . '/inc/app-only-downloads.php';

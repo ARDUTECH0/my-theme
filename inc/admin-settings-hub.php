@@ -48,6 +48,17 @@ function ecm_settings_hub_page() {
         $smtp_badge = [ 'text' => 'متوقف', 'ok' => false ];
     }
 
+    // شارة التحديث عن بُعد
+    if ( function_exists( 'ecm_ota_opts' ) && function_exists( 'ecm_ota_stats' ) ) {
+        $ota_on    = ! empty( ecm_ota_opts()['enabled'] );
+        $ota_st    = ecm_ota_stats();
+        $ota_badge = $ota_on
+            ? [ 'text' => $ota_st['devices'] . ' جهاز · ' . $ota_st['releases'] . ' إصدار', 'ok' => true ]
+            : [ 'text' => 'متوقف', 'ok' => false ];
+    } else {
+        $ota_badge = null;
+    }
+
     $cards = [
         [
             'icon' => '🔗', 'title' => 'ربط التطبيق بالأجهزة',
@@ -72,6 +83,12 @@ function ecm_settings_hub_page() {
             'desc' => 'إدارة سيريالات الأجهزة وحالتها وربطها بالعملاء.',
             'badge' => null,
             'url'  => admin_url( 'admin.php?page=ecm-serials' ), 'cta' => 'فتح',
+        ],
+        [
+            'icon' => '📡', 'title' => 'التحديث عن بُعد (OTA)',
+            'desc' => 'ارفع فيرموير الأجهزة، اطرحه تدريجيًا، وتابع الأسطول وهو بيتحدّث.',
+            'badge' => $ota_badge,
+            'url'  => admin_url( 'admin.php?page=ecm-ota' ), 'cta' => 'إدارة التحديثات',
         ],
         [
             'icon' => '🔌', 'title' => 'API والتوكن',

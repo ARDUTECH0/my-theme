@@ -24,6 +24,8 @@ function ecm_backup_option_keys(): array {
         'ecm_gh_repo', 'ecm_gh_token',
         // بيانات التطبيقات/السوفت وير
         'ecm_apps_data', 'ecm_firmware_data', 'ecm_sw_version',
+        // التحديث عن بُعد (OTA) — الإعدادات ومفاتيح التوقيع
+        'ecm_ota_opts', 'ecm_ota_secret', 'ecm_ota_dir_slug',
         // المتجر والتواصل
         'ecm_free_store', 'ecm_free_store_text', 'ecm_email', 'ecm_whatsapp',
     ];
