@@ -378,7 +378,7 @@ add_action( 'wp_enqueue_scripts', 'ecm_enqueue_assets' );
 
 
 // ── THEME VERSION CONSTANT ───────────────────────────────────
-define( 'ECM_VERSION', '3.0.69' );
+define( 'ECM_VERSION', '3.0.70' );
 
 
 // ── INCLUDE: FRONT PAGE CUSTOMIZER ──────────────────────────
