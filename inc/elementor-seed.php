@@ -667,16 +667,28 @@ function ecm_build_upload_elements(): array {
 
 /**
  * يزرع بيانات Elementor في صفحة — بدون الكتابة فوق صفحة مبنية مسبقًا.
+ * لو force=true وفيه تصميم موجود فعلاً، بياخد نسخة احتياطية منه الأول
+ * (قابلة للاسترجاع بضغطة واحدة من ecm_elementor_seed_restore_backup) قبل ما يكتب فوقه.
  */
 function ecm_seed_elementor_page( int $page_id, array $elements, bool $force = false ): bool {
     if ( ! $page_id ) return false;
 
+    $existing     = get_post_meta( $page_id, '_elementor_data', true );
+    $has_existing = ( ! empty( $existing ) && '[]' !== $existing );
+
     // حماية: لو الصفحة فيها بيانات Elementor فعلاً — لا تلمسها (إلا مع force)
-    if ( ! $force ) {
-        $existing = get_post_meta( $page_id, '_elementor_data', true );
-        if ( ! empty( $existing ) && $existing !== '[]' ) {
-            return false;
-        }
+    if ( ! $force && $has_existing ) {
+        return false;
+    }
+
+    // هنكتب فوق تصميم موجود بالفعل — احفظ نسخة احتياطية قابلة للاسترجاع الأول
+    if ( $force && $has_existing ) {
+        update_post_meta( $page_id, '_ecm_elementor_backup', wp_json_encode( [
+            'data'      => $existing,
+            'edit_mode' => get_post_meta( $page_id, '_elementor_edit_mode', true ),
+            'template'  => get_post_meta( $page_id, '_elementor_template_type', true ),
+            'time'      => current_time( 'mysql' ),
+        ] ) );
     }
 
     update_post_meta( $page_id, '_elementor_edit_mode', 'builder' );
@@ -687,6 +699,40 @@ function ecm_seed_elementor_page( int $page_id, array $elements, bool $force = f
     // Elementor يخزّن الـ JSON مع slashes
     update_post_meta( $page_id, '_elementor_data', wp_slash( wp_json_encode( $elements ) ) );
 
+    return true;
+}
+
+/** هل فيه نسخة احتياطية قابلة للاسترجاع لصفحة معينة؟ */
+function ecm_elementor_seed_has_backup( int $page_id ): bool {
+    return $page_id > 0 && '' !== (string) get_post_meta( $page_id, '_ecm_elementor_backup', true );
+}
+
+/**
+ * يرجّع تصميم الصفحة للنسخة اللي كانت موجودة قبل آخر عملية زرع (force).
+ * نسخة احتياطية واحدة بس محفوظة لكل صفحة (آخر واحدة قبل الكتابة فوقها).
+ */
+function ecm_elementor_seed_restore_backup( int $page_id ): bool {
+    $raw = get_post_meta( $page_id, '_ecm_elementor_backup', true );
+    if ( '' === $raw ) {
+        return false;
+    }
+    $backup = json_decode( (string) $raw, true );
+    if ( ! is_array( $backup ) || ! isset( $backup['data'] ) ) {
+        return false;
+    }
+
+    update_post_meta( $page_id, '_elementor_data', $backup['data'] );
+    if ( ! empty( $backup['edit_mode'] ) ) {
+        update_post_meta( $page_id, '_elementor_edit_mode', $backup['edit_mode'] );
+    }
+    if ( ! empty( $backup['template'] ) ) {
+        update_post_meta( $page_id, '_elementor_template_type', $backup['template'] );
+    }
+    delete_post_meta( $page_id, '_ecm_elementor_backup' );
+
+    if ( class_exists( '\Elementor\Plugin' ) ) {
+        \Elementor\Plugin::$instance->files_manager->clear_cache();
+    }
     return true;
 }
 
@@ -803,21 +849,21 @@ function ecm_elementor_seed_resolve_pid( string $key, array $entry ): int {
 
 /**
  * حالة صفحات Elementor — للتشخيص وزرار الزرع الفردي في لوحة التحكم.
- * يعيد صفوف: [ key, label, id, مبني؟, حجم البيانات بالبايت, رابط تعديل Elementor ]
+ * يعيد صفوف: [ key, label, id, مبني؟, حجم البيانات بالبايت, رابط تعديل Elementor, فيه نسخة احتياطية؟ ]
  */
 function ecm_elementor_pages_status(): array {
     $out = [];
     foreach ( ecm_elementor_seed_registry() as $key => $entry ) {
         $id = ecm_elementor_seed_resolve_pid( $key, $entry );
         if ( ! $id ) {
-            $out[] = [ $key, $entry['label'], 0, false, 0, '' ];
+            $out[] = [ $key, $entry['label'], 0, false, 0, '', false ];
             continue;
         }
         $data  = (string) get_post_meta( $id, '_elementor_data', true );
         $mode  = get_post_meta( $id, '_elementor_edit_mode', true );
         $built = ( 'builder' === $mode && '' !== $data && '[]' !== $data );
         $edit  = admin_url( 'post.php?post=' . $id . '&action=elementor' );
-        $out[] = [ $key, $entry['label'], $id, $built, strlen( $data ), $edit ];
+        $out[] = [ $key, $entry['label'], $id, $built, strlen( $data ), $edit, ecm_elementor_seed_has_backup( $id ) ];
     }
     return $out;
 }
@@ -856,6 +902,35 @@ function ecm_handle_reseed_one() {
     exit;
 }
 add_action( 'admin_init', 'ecm_handle_reseed_one', 5 );
+
+/**
+ * معالج زر «↩️ استرجاع النسخة اللي قبل الزرع» لصفحة واحدة.
+ * بيرجّع تصميم Elementor للحالة اللي كانت عليها الصفحة قبل آخر عملية زرع (فردية أو جماعية).
+ */
+function ecm_handle_reseed_restore() {
+    if ( empty( $_POST['ecm_reseed_restore'] ) ) return;
+    if ( ! current_user_can( 'manage_options' ) ) return;
+    check_admin_referer( 'ecm_reseed_restore_nonce' );
+
+    $key      = sanitize_key( wp_unslash( $_POST['ecm_reseed_restore'] ) );
+    $registry = ecm_elementor_seed_registry();
+    $ok       = 0;
+    $label    = '';
+
+    if ( isset( $registry[ $key ] ) ) {
+        $entry = $registry[ $key ];
+        $label = $entry['label'];
+        $pid   = ecm_elementor_seed_resolve_pid( $key, $entry );
+        if ( $pid ) {
+            $ok = ecm_elementor_seed_restore_backup( $pid ) ? 1 : 0;
+        }
+    }
+
+    set_transient( 'ecm_reseed_restore_label', $label, 60 );
+    wp_safe_redirect( admin_url( 'admin.php?page=ecm-dashboard&ecm_reseed_restore=' . $ok ) );
+    exit;
+}
+add_action( 'admin_init', 'ecm_handle_reseed_restore', 5 );
 
 
 // ════════════════════════════════════════════════════════════

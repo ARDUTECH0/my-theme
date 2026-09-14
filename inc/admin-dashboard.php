@@ -433,9 +433,18 @@ function ecm_dashboard_page() {
                 $one_label = (string) get_transient( 'ecm_reseed_one_label' );
                 delete_transient( 'ecm_reseed_one_label' );
                 if ( '1' === $_GET['ecm_reseed_one'] ) {
-                    echo '<div class="ecm-notice ecm-notice-success">🌱 اتزرعت صفحة «<strong>' . esc_html( $one_label ) . '</strong>» بـ Elementor. افتحها وشوفها.</div>';
+                    echo '<div class="ecm-notice ecm-notice-success">🌱 اتزرعت صفحة «<strong>' . esc_html( $one_label ) . '</strong>» بـ Elementor. لو كان فيها تصميم قبل كده، اتحفظت نسخة منه وتقدر ترجعها بزرار «↩️ استرجاع» جنبها في أي وقت.</div>';
                 } else {
                     echo '<div class="ecm-notice ecm-notice-warn">⚠️ مقدرناش نزرع الصفحة دي — اتأكد إنها موجودة الأول من قسم «حالة الصفحات» تحت.</div>';
+                }
+            }
+            if ( isset( $_GET['ecm_reseed_restore'] ) ) {
+                $rst_label = (string) get_transient( 'ecm_reseed_restore_label' );
+                delete_transient( 'ecm_reseed_restore_label' );
+                if ( '1' === $_GET['ecm_reseed_restore'] ) {
+                    echo '<div class="ecm-notice ecm-notice-success">↩️ رجّعنا صفحة «<strong>' . esc_html( $rst_label ) . '</strong>» للتصميم اللي كان موجود قبل آخر زرع.</div>';
+                } else {
+                    echo '<div class="ecm-notice ecm-notice-warn">⚠️ مفيش نسخة احتياطية محفوظة للصفحة دي عشان نرجّعها.</div>';
                 }
             }
             $status = ecm_elementor_pages_status();
@@ -444,7 +453,8 @@ function ecm_dashboard_page() {
         <div class="ecm-admin-form">
             <p style="margin:0 0 16px; color:#6b7080; font-size:13px;">
                 لو أي صفحة طالعة <strong>فاضية</strong>، دوس «🌱 زرع هذه الصفحة» جنبها — بتتزرع هي بس من غير ما يتلمس أي صفحة تانية.
-                لو عايز تعيد بناء كل الصفحات مرة واحدة استخدم الزرار في الآخر. <strong>تنبيه:</strong> أي زرع (فردي أو جماعي) بيكتب فوق أي تعديل عملته في Elementor للصفحة دي.
+                لو عايز تعيد بناء كل الصفحات مرة واحدة استخدم الزرار في الآخر. <strong>تنبيه:</strong> أي زرع (فردي أو جماعي) بيكتب فوق أي تعديل عملته في Elementor للصفحة دي —
+                بس متقلقش، بناخد نسخة احتياطية أوتوماتيك قبل الكتابة فوقها، وتقدر ترجعها بزرار «↩️ استرجاع» لو ظهر جنب الصفحة.
             </p>
             <table class="ecm-admin-table" style="margin-bottom:20px;">
                 <thead>
@@ -452,7 +462,7 @@ function ecm_dashboard_page() {
                 </thead>
                 <tbody>
                     <?php foreach ( $status as $row ) :
-                        list( $key, $label, $pid, $built, $bytes, $edit ) = $row; ?>
+                        list( $key, $label, $pid, $built, $bytes, $edit, $has_backup ) = $row; ?>
                     <tr>
                         <td><strong><?php echo esc_html( $label ); ?></strong></td>
                         <td>
@@ -463,15 +473,25 @@ function ecm_dashboard_page() {
                             <?php else : ?>
                                 <span class="ecm-admin-badge ecm-badge-orange">⚠️ فاضية / مش مزروعة</span>
                             <?php endif; ?>
+                            <?php if ( $has_backup ) : ?>
+                                <br><span class="ecm-admin-badge ecm-badge-blue" style="margin-top:4px;">🗄 فيه نسخة قبل آخر زرع</span>
+                            <?php endif; ?>
                         </td>
                         <td><?php echo $bytes ? esc_html( number_format( $bytes ) . ' B' ) : '—'; ?></td>
                         <td style="white-space:nowrap;">
                             <?php if ( $pid && $edit ) : ?><a href="<?php echo esc_url( $edit ); ?>" class="ecm-admin-btn ecm-admin-btn-ghost" style="padding:5px 12px;">تعديل بـ Elementor</a><?php endif; ?>
                             <?php if ( $pid ) : ?>
                             <form method="post" style="display:inline-block; margin-inline-start:6px;"
-                                  onsubmit="return confirm('متأكد؟ ده هيكتب فوق أي تعديل عملته في Elementor لصفحة «<?php echo esc_js( $label ); ?>» بس — باقي الصفحات مش هتتلمس.');">
+                                  onsubmit="return confirm('متأكد؟ ده هيكتب فوق أي تعديل عملته في Elementor لصفحة «<?php echo esc_js( $label ); ?>» بس — باقي الصفحات مش هتتلمس (وهنحفظلك نسخة منه قبل ما نكتب فوقه).');">
                                 <?php wp_nonce_field( 'ecm_reseed_one_nonce' ); ?>
                                 <button type="submit" name="ecm_reseed_one" value="<?php echo esc_attr( $key ); ?>" class="ecm-admin-btn ecm-admin-btn-ghost" style="padding:5px 12px;">🌱 زرع هذه الصفحة</button>
+                            </form>
+                            <?php endif; ?>
+                            <?php if ( $has_backup ) : ?>
+                            <form method="post" style="display:inline-block; margin-inline-start:6px;"
+                                  onsubmit="return confirm('ترجّع صفحة «<?php echo esc_js( $label ); ?>» للتصميم اللي كان موجود قبل آخر زرع؟');">
+                                <?php wp_nonce_field( 'ecm_reseed_restore_nonce' ); ?>
+                                <button type="submit" name="ecm_reseed_restore" value="<?php echo esc_attr( $key ); ?>" class="ecm-admin-btn ecm-admin-btn-ghost" style="padding:5px 12px; color:#2271b1;">↩️ استرجاع</button>
                             </form>
                             <?php endif; ?>
                         </td>
