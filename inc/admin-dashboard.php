@@ -429,13 +429,22 @@ function ecm_dashboard_page() {
                 delete_transient( 'ecm_reseed_count' );
                 echo '<div class="ecm-notice ecm-notice-success">🔁 تمت إعادة بناء <strong>' . esc_html( $rc ) . '</strong> صفحة بـ Elementor. افتح أي صفحة بـ "تعديل بـ Elementor" للتأكد.</div>';
             }
+            if ( isset( $_GET['ecm_reseed_one'] ) ) {
+                $one_label = (string) get_transient( 'ecm_reseed_one_label' );
+                delete_transient( 'ecm_reseed_one_label' );
+                if ( '1' === $_GET['ecm_reseed_one'] ) {
+                    echo '<div class="ecm-notice ecm-notice-success">🌱 اتزرعت صفحة «<strong>' . esc_html( $one_label ) . '</strong>» بـ Elementor. افتحها وشوفها.</div>';
+                } else {
+                    echo '<div class="ecm-notice ecm-notice-warn">⚠️ مقدرناش نزرع الصفحة دي — اتأكد إنها موجودة الأول من قسم «حالة الصفحات» تحت.</div>';
+                }
+            }
             $status = ecm_elementor_pages_status();
         ?>
         <h2 class="ecm-dash-section-title">🧩 حالة صفحات Elementor</h2>
         <div class="ecm-admin-form">
             <p style="margin:0 0 16px; color:#6b7080; font-size:13px;">
-                لو أي صفحة طالعة <strong>فاضية</strong>، اضغط «إعادة بناء» تحت — ده بيكتب تصميم الثيم
-                جوه Elementor من جديد. <strong>تنبيه:</strong> الإعادة بتكتب فوق أي تعديل عملته في Elementor.
+                لو أي صفحة طالعة <strong>فاضية</strong>، دوس «🌱 زرع هذه الصفحة» جنبها — بتتزرع هي بس من غير ما يتلمس أي صفحة تانية.
+                لو عايز تعيد بناء كل الصفحات مرة واحدة استخدم الزرار في الآخر. <strong>تنبيه:</strong> أي زرع (فردي أو جماعي) بيكتب فوق أي تعديل عملته في Elementor للصفحة دي.
             </p>
             <table class="ecm-admin-table" style="margin-bottom:20px;">
                 <thead>
@@ -443,7 +452,7 @@ function ecm_dashboard_page() {
                 </thead>
                 <tbody>
                     <?php foreach ( $status as $row ) :
-                        list( $label, $pid, $built, $bytes, $edit ) = $row; ?>
+                        list( $key, $label, $pid, $built, $bytes, $edit ) = $row; ?>
                     <tr>
                         <td><strong><?php echo esc_html( $label ); ?></strong></td>
                         <td>
@@ -456,14 +465,23 @@ function ecm_dashboard_page() {
                             <?php endif; ?>
                         </td>
                         <td><?php echo $bytes ? esc_html( number_format( $bytes ) . ' B' ) : '—'; ?></td>
-                        <td><?php if ( $pid && $edit ) : ?><a href="<?php echo esc_url( $edit ); ?>" class="ecm-admin-btn ecm-admin-btn-ghost" style="padding:5px 12px;">تعديل بـ Elementor</a><?php endif; ?></td>
+                        <td style="white-space:nowrap;">
+                            <?php if ( $pid && $edit ) : ?><a href="<?php echo esc_url( $edit ); ?>" class="ecm-admin-btn ecm-admin-btn-ghost" style="padding:5px 12px;">تعديل بـ Elementor</a><?php endif; ?>
+                            <?php if ( $pid ) : ?>
+                            <form method="post" style="display:inline-block; margin-inline-start:6px;"
+                                  onsubmit="return confirm('متأكد؟ ده هيكتب فوق أي تعديل عملته في Elementor لصفحة «<?php echo esc_js( $label ); ?>» بس — باقي الصفحات مش هتتلمس.');">
+                                <?php wp_nonce_field( 'ecm_reseed_one_nonce' ); ?>
+                                <button type="submit" name="ecm_reseed_one" value="<?php echo esc_attr( $key ); ?>" class="ecm-admin-btn ecm-admin-btn-ghost" style="padding:5px 12px;">🌱 زرع هذه الصفحة</button>
+                            </form>
+                            <?php endif; ?>
+                        </td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
             </table>
-            <form method="post" onsubmit="return confirm('متأكد؟ ده هيكتب فوق أي تعديل عملته في Elementor للصفحات دي.');">
+            <form method="post" onsubmit="return confirm('متأكد؟ ده هيكتب فوق أي تعديل عملته في Elementor لكل الصفحات دي.');">
                 <?php wp_nonce_field( 'ecm_reseed_nonce' ); ?>
-                <button type="submit" name="ecm_reseed" value="1" class="ecm-admin-btn">🔁 إعادة بناء صفحات Elementor</button>
+                <button type="submit" name="ecm_reseed" value="1" class="ecm-admin-btn">🔁 إعادة بناء كل الصفحات دفعة واحدة</button>
             </form>
         </div>
         <?php endif; ?>

@@ -775,36 +775,87 @@ add_action( 'admin_init', 'ecm_handle_reseed', 5 );
 
 
 /**
- * حالة صفحات Elementor — للتشخيص في لوحة التحكم.
- * يعيد صفوف: [ الاسم, ID, مبني؟, حجم البيانات بالبايت, رابط تعديل Elementor ]
+ * السجل الموحّد لكل صفحة ممكن تتزرع بـ Elementor: مفتاح ثابت + اسم للعرض
+ * + قالب الصفحة (فاضي = الصفحة الرئيسية) + اسم دالة البناء.
+ * ده المصدر الوحيد لقائمة الصفحات — تحالة العرض وزرار الزرع الفردي بيقروا منه.
+ */
+function ecm_elementor_seed_registry(): array {
+    return [
+        'front'    => [ 'label' => 'الصفحة الرئيسية',      'template' => '', 'builder' => 'ecm_build_frontpage_elements' ],
+        'app'      => [ 'label' => 'تحميل التطبيق',         'template' => 'page-download-app.php',    'builder' => 'ecm_build_app_elements' ],
+        'docs'     => [ 'label' => 'التوثيق',                'template' => 'page-documentation.php',   'builder' => 'ecm_build_docs_elements' ],
+        'software' => [ 'label' => 'السوفت وير',             'template' => 'page-software.php',        'builder' => 'ecm_build_software_elements' ],
+        'upload'   => [ 'label' => 'رفع السوفت وير',         'template' => 'page-upload-software.php', 'builder' => 'ecm_build_upload_elements' ],
+        'camera'   => [ 'label' => 'التحكم في الكاميرا',     'template' => 'page-camera-control.php',  'builder' => 'ecm_build_camera_elements' ],
+        'vehicle'  => [ 'label' => 'التحكم في المركبة',      'template' => 'page-vehicle-control.php', 'builder' => 'ecm_build_vehicle_elements' ],
+        'relay'    => [ 'label' => 'لوحة المفاتيح',          'template' => 'page-relay-panel.php',     'builder' => 'ecm_build_relay_elements' ],
+        'gamepad'  => [ 'label' => 'التحكم بذراع الألعاب',   'template' => 'page-gamepad.php',         'builder' => 'ecm_build_gamepad_elements' ],
+    ];
+}
+
+/** آي دي صفحة من مفتاحها في السجل (الصفحة الرئيسية حالة خاصة) */
+function ecm_elementor_seed_resolve_pid( string $key, array $entry ): int {
+    if ( 'front' === $key ) {
+        return (int) get_option( 'page_on_front' );
+    }
+    return function_exists( 'ecm_find_page_by_template' ) ? ecm_find_page_by_template( $entry['template'] ) : 0;
+}
+
+/**
+ * حالة صفحات Elementor — للتشخيص وزرار الزرع الفردي في لوحة التحكم.
+ * يعيد صفوف: [ key, label, id, مبني؟, حجم البيانات بالبايت, رابط تعديل Elementor ]
  */
 function ecm_elementor_pages_status(): array {
-    $pages = [
-        'الصفحة الرئيسية' => (int) get_option( 'page_on_front' ),
-        'تحميل التطبيق'   => ecm_find_page_by_template( 'page-download-app.php' ),
-        'التوثيق'         => ecm_find_page_by_template( 'page-documentation.php' ),
-        'السوفت وير'      => ecm_find_page_by_template( 'page-software.php' ),
-        'رفع السوفت وير'  => ecm_find_page_by_template( 'page-upload-software.php' ),
-        'التحكم في الكاميرا' => ecm_find_page_by_template( 'page-camera-control.php' ),
-        'التحكم في المركبة'  => ecm_find_page_by_template( 'page-vehicle-control.php' ),
-        'لوحة المفاتيح'      => ecm_find_page_by_template( 'page-relay-panel.php' ),
-        'التحكم بذراع الألعاب' => ecm_find_page_by_template( 'page-gamepad.php' ),
-    ];
-
     $out = [];
-    foreach ( $pages as $label => $id ) {
+    foreach ( ecm_elementor_seed_registry() as $key => $entry ) {
+        $id = ecm_elementor_seed_resolve_pid( $key, $entry );
         if ( ! $id ) {
-            $out[] = [ $label, 0, false, 0, '' ];
+            $out[] = [ $key, $entry['label'], 0, false, 0, '' ];
             continue;
         }
         $data  = (string) get_post_meta( $id, '_elementor_data', true );
         $mode  = get_post_meta( $id, '_elementor_edit_mode', true );
         $built = ( 'builder' === $mode && '' !== $data && '[]' !== $data );
         $edit  = admin_url( 'post.php?post=' . $id . '&action=elementor' );
-        $out[] = [ $label, $id, $built, strlen( $data ), $edit ];
+        $out[] = [ $key, $entry['label'], $id, $built, strlen( $data ), $edit ];
     }
     return $out;
 }
+
+/**
+ * معالج زر «زرع» لصفحة واحدة بعينها — من لوحة التحكم.
+ * بيكتب فوق تصميم الصفحة دي بس (force) من غير ما يلمس باقي الصفحات،
+ * عشان تقدر تزرع كل صفحة براحتك بدل ما تعيد بناء الكل مرة واحدة.
+ */
+function ecm_handle_reseed_one() {
+    if ( empty( $_POST['ecm_reseed_one'] ) ) return;
+    if ( ! current_user_can( 'manage_options' ) ) return;
+    check_admin_referer( 'ecm_reseed_one_nonce' );
+    if ( ! did_action( 'elementor/loaded' ) ) return;
+
+    $key      = sanitize_key( wp_unslash( $_POST['ecm_reseed_one'] ) );
+    $registry = ecm_elementor_seed_registry();
+    $ok       = 0;
+    $label    = '';
+
+    if ( isset( $registry[ $key ] ) ) {
+        $entry = $registry[ $key ];
+        $label = $entry['label'];
+        $pid   = ecm_elementor_seed_resolve_pid( $key, $entry );
+
+        if ( $pid && function_exists( $entry['builder'] ) ) {
+            $ok = ecm_seed_elementor_page( $pid, call_user_func( $entry['builder'] ), true ) ? 1 : 0;
+            if ( $ok && class_exists( '\Elementor\Plugin' ) ) {
+                \Elementor\Plugin::$instance->files_manager->clear_cache();
+            }
+        }
+    }
+
+    set_transient( 'ecm_reseed_one_label', $label, 60 );
+    wp_safe_redirect( admin_url( 'admin.php?page=ecm-dashboard&ecm_reseed_one=' . $ok ) );
+    exit;
+}
+add_action( 'admin_init', 'ecm_handle_reseed_one', 5 );
 
 
 // ════════════════════════════════════════════════════════════
