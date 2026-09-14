@@ -1,286 +1,241 @@
-# ECM — التحديث عن بُعد للأجهزة (OTA)
+# ECM — كود البورده (مستقبِل التحديث المحلي)
 
-دليل الجهاز: إزاي الـ ESP32 / ESP8266 بيسأل السيرفر عن تحديث، ينزّله، ويبلّغ بالنتيجة.
+البورده شغّالة على شبكة داخلية **من غير إنترنت**، فهي مابتسحبش التحديث من الموقع.
+بدل كده بتفتح سيرفر HTTP صغير على الشبكة الداخلية، والتطبيق هو اللي **بيدفع** الفيرموير عليها.
 
----
-
-## 1. الفكرة في سطرين
-
-الجهاز بيسأل `/ota/check` ومعاه **السيريال + التوكن + إصداره الحالي**.
-لو فيه تحديث، السيرفر بيرجّع **رابط موقّع بينتهي بعد 15 دقيقة** ومربوط بالجهاز ده لوحده، ومعاه بصمة MD5.
-الجهاز ينزّل، يتحقق من البصمة، يعمل reboot، وبعدين يبلّغ `/ota/report`.
-
-مفيش رابط ثابت للفيرموير — ملفات الـ `.bin` محفوظة في مجلد محمي بره متناول المتصفح.
-
----
-
-## 2. نقاط الاتصال
-
-### `GET /wp-json/ecm/v1/ota/check`
-
-| البراميتر | إجباري | الوصف |
-|---|---|---|
-| `serial`  | ✔ | سيريال الجهاز |
-| `token`   | ✔ (لو التوثيق مفعّل) | توكن الجهاز — بيتولّد لما العميل يربط السيريال بحسابه. ممكن كمان يتبعت كهيدر `X-ECM-Device-Token` |
-| `version` | ✔ | إصدار الفيرموير الحالي، مثلاً `1.0.3` |
-| `model`   | – | موديل اللوحة (افتراضي `default`) |
-| `channel` | – | `stable` / `beta` / `dev` — القناة المثبّتة من اللوحة بتكسب |
-| `chip`, `mac`, `rssi`, `uptime` | – | تليمتري بتظهر في لوحة الأسطول |
-
-**الرد لما يكون فيه تحديث:**
-
-```json
-{
-  "ok": true,
-  "update": true,
-  "version": "1.2.0",
-  "url": "https://site.com/wp-json/ecm/v1/ota/download?r=7&s=ECM123&e=1760000000&k=...",
-  "md5": "9f86d081884c7d659a2feaa0c55ad015",
-  "sha256": "...",
-  "size": 892144,
-  "mandatory": false,
-  "notes": "إصلاح انقطاع الواي فاي",
-  "check_in": 21600
-}
+```
+[ووردبريس] ──إنترنت──> [التطبيق] ──شبكة داخلية──> [البورده]
+                          ينزّل ويخزّن            يستقبل ويفلَش
 ```
 
-**لما ميكونش فيه:** `{"ok":true,"update":false,"check_in":21600}`
-
-`check_in` = السيرفر بيقول للجهاز يسأل تاني بعد كام ثانية. اقراه بدل ما تحرق الرقم في الكود.
-
-### `GET /wp-json/ecm/v1/ota/download?...`
-
-بيرمي ملف الـ `.bin` نفسه، ومعاه هيدر `x-MD5` اللي مكتبة `httpUpdate` بتتحقق بيه أوتوماتيك.
-الرابط بيموت بعد المدة المضبوطة في اللوحة — متخزنهوش في الـ NVS.
-
-### `POST /wp-json/ecm/v1/ota/report`
-
-`serial`, `token`, `version`, `status` = `success` / `failed` / `updating`, `error` (نص قصير).
-
-مهم: بعد أول boot ناجح على الإصدار الجديد، ابعت `success` بالإصدار الجديد — ده اللي بيفكّ «الإصدار المثبّت» في اللوحة وبيحدّث عدّادات النجاح.
+> تدفّق التطبيق نفسه في [ota-app-flow.md](ota-app-flow.md).
 
 ---
 
-## 3. كود ESP32 كامل
+## 1. الـ endpoints اللي البورده بتفتحها
+
+| المسار | الميثود | الوظيفة |
+|---|---|---|
+| `/ecm/info`    | GET  | يرجّع السيريال والموديل والإصدار الحالي — التطبيق بيقراه الأول |
+| `/ecm/update`  | POST | استقبال ملف الـ `.bin` (multipart) وفلَشه |
+| `/ecm/reboot`  | POST | إعادة تشغيل يدوية |
+
+كلهم محميين بهيدر `X-ECM-Key` — مفتاح محلي متخزّن في الـ NVS.
+
+---
+
+## 2. كود ESP32 كامل
 
 ```cpp
 /*
- * ECM OTA Client — ESP32 (Arduino core 2.x / 3.x)
- * Libraries: WiFi, HTTPClient, HTTPUpdate, ArduinoJson (v6+), Preferences
+ * ECM Local OTA Receiver — ESP32 (Arduino core 2.x / 3.x)
+ * Libraries: WiFi, WebServer, Update, Preferences, ArduinoJson (v6+)
+ *
+ * البورده بتشتغل على شبكة داخلية من غير إنترنت.
+ * التطبيق بيلاقيها، يقرا إصدارها، ويرفع عليها الفيرموير الجديد.
  */
 #include <WiFi.h>
-#include <WiFiClientSecure.h>
-#include <HTTPClient.h>
-#include <HTTPUpdate.h>
-#include <ArduinoJson.h>
+#include <WebServer.h>
+#include <Update.h>
 #include <Preferences.h>
+#include <ESPmDNS.h>
 
-// ── إعدادات الجهاز ────────────────────────────────────────────
-#define FW_VERSION   "1.0.0"          // زوّده مع كل build
-#define FW_MODEL     "default"        // نفس الموديل اللي في اللوحة
-#define ECM_HOST     "https://ecameraman.com"
-#define WIFI_SSID    "YOUR_SSID"
-#define WIFI_PASS    "YOUR_PASS"
+#define FW_VERSION   "1.0.0"       // زوّده مع كل build
+#define FW_MODEL     "default"     // نفس الموديل اللي في لوحة ECM
 
-// السيريال والتوكن — الأفضل يتخزنوا في NVS مش في الكود
-String g_serial = "ECM-0001";
-String g_token  = "";                 // توكن الجهاز من صفحة تفعيل الجهاز
+// شبكة داخلية — من غير إنترنت
+#define LAN_SSID     "ECM-LOCAL"
+#define LAN_PASS     "YOUR_LOCAL_PASS"
 
+WebServer   server(80);
 Preferences prefs;
-unsigned long g_nextCheck = 0;
-uint32_t      g_checkIn   = 21600;    // ثانية — السيرفر بيعدّلها
 
-// شهادة الـ root CA بتاعت السيرفر. للتجارب بس ممكن setInsecure().
-static const char* ECM_ROOT_CA = nullptr;
+String g_serial   = "";            // بيتكتب مرة واحدة وقت التصنيع/التجهيز
+String g_localKey = "";            // مفتاح الحماية المحلي
 
-static void applyTls(WiFiClientSecure& c) {
-  if (ECM_ROOT_CA) c.setCACert(ECM_ROOT_CA);
-  else             c.setInsecure();   // ⚠️ للتجارب فقط — حطّ الشهادة في الإنتاج
-}
-
-// ── إرسال تقرير للسيرفر ───────────────────────────────────────
-void otaReport(const char* status, const String& version, const String& err = "") {
-  WiFiClientSecure client; applyTls(client);
-  HTTPClient http;
-  String url = String(ECM_HOST) + "/wp-json/ecm/v1/ota/report";
-  if (!http.begin(client, url)) return;
-
-  http.addHeader("Content-Type", "application/x-www-form-urlencoded");
-  String body = "serial=" + g_serial + "&token=" + g_token +
-                "&version=" + version + "&status=" + status;
-  if (err.length()) body += "&error=" + err;
-
-  http.POST(body);
-  http.end();
-}
-
-// ── السؤال عن تحديث ───────────────────────────────────────────
-void otaCheck() {
-  if (WiFi.status() != WL_CONNECTED) return;
-
-  WiFiClientSecure client; applyTls(client);
-  HTTPClient http;
-
-  String url = String(ECM_HOST) + "/wp-json/ecm/v1/ota/check"
-             + "?serial="  + g_serial
-             + "&version=" + FW_VERSION
-             + "&model="   + FW_MODEL
-             + "&mac="     + WiFi.macAddress()
-             + "&rssi="    + String(WiFi.RSSI())
-             + "&uptime="  + String(millis() / 1000);
-
-  if (!http.begin(client, url)) return;
-  http.addHeader("X-ECM-Device-Token", g_token);
-
-  int code = http.GET();
-  if (code != 200) {
-    Serial.printf("[OTA] check failed: %d\n", code);
-    http.end();
-    return;
-  }
-
-  StaticJsonDocument<768> doc;
-  DeserializationError e = deserializeJson(doc, http.getStream());
-  http.end();
-  if (e) { Serial.println("[OTA] bad json"); return; }
-
-  if (doc["check_in"].is<uint32_t>()) g_checkIn = doc["check_in"];
-
-  if (!doc["update"].as<bool>()) {
-    Serial.println("[OTA] الجهاز على أحدث إصدار");
-    return;
-  }
-
-  String newVer = doc["version"] | "";
-  String binUrl = doc["url"]     | "";
-  if (!binUrl.length()) return;
-
-  Serial.printf("[OTA] تحديث متاح: %s (%u bytes)\n",
-                newVer.c_str(), (unsigned) (doc["size"] | 0));
-
-  // نحفظ الإصدار المنتظر عشان نبلّغ بنجاحه بعد الـ reboot
-  prefs.begin("ecm", false);
-  prefs.putString("pending", newVer);
+// ── قراءة الهوية من الـ NVS ───────────────────────────────────
+void loadIdentity() {
+  prefs.begin("ecm", true);
+  g_serial   = prefs.getString("serial", "");
+  g_localKey = prefs.getString("key", "");
   prefs.end();
 
-  otaReport("updating", FW_VERSION);
-  doUpdate(binUrl, newVer);
-}
-
-// ── تنفيذ التحديث ─────────────────────────────────────────────
-void doUpdate(const String& binUrl, const String& newVer) {
-  WiFiClientSecure client; applyTls(client);
-
-  httpUpdate.rebootOnUpdate(false);        // نتحكم في الـ reboot بنفسنا
-  httpUpdate.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
-
-  // المكتبة بتتحقق من هيدر x-MD5 اللي السيرفر بيبعته
-  t_httpUpdate_return ret = httpUpdate.update(client, binUrl, FW_VERSION);
-
-  switch (ret) {
-    case HTTP_UPDATE_OK:
-      Serial.println("[OTA] تم — إعادة تشغيل");
-      delay(200);
-      ESP.restart();
-      break;
-
-    case HTTP_UPDATE_NO_UPDATES:
-      Serial.println("[OTA] مفيش جديد");
-      break;
-
-    case HTTP_UPDATE_FAILED: {
-      String err = String(httpUpdate.getLastError()) + ":" + httpUpdate.getLastErrorString();
-      Serial.printf("[OTA] فشل — %s\n", err.c_str());
-      otaReport("failed", FW_VERSION, err);
-      prefs.begin("ecm", false); prefs.remove("pending"); prefs.end();
-      break;
-    }
+  // أول تشغيل: ولّد مفتاح محلي عشوائي
+  if (g_localKey.isEmpty()) {
+    char buf[33];
+    for (int i = 0; i < 32; i++) buf[i] = "0123456789abcdef"[esp_random() % 16];
+    buf[32] = 0;
+    g_localKey = String(buf);
+    prefs.begin("ecm", false);
+    prefs.putString("key", g_localKey);
+    prefs.end();
+    Serial.printf("[ECM] مفتاح محلي جديد: %s\n", g_localKey.c_str());
   }
 }
 
-// ── بعد الإقلاع: أبلغ بنجاح التحديث ──────────────────────────
-void otaConfirmBoot() {
-  prefs.begin("ecm", false);
-  String pending = prefs.getString("pending", "");
-  if (pending.length()) {
-    if (pending == FW_VERSION) {
-      otaReport("success", FW_VERSION);      // الإصدار الجديد اشتغل فعلاً
-    } else {
-      otaReport("failed", FW_VERSION, "rollback-or-version-mismatch");
+// ── التحقق من المفتاح ─────────────────────────────────────────
+bool authed() {
+  if (!server.hasHeader("X-ECM-Key")) return false;
+  String k = server.header("X-ECM-Key");
+  if (k.length() != g_localKey.length()) return false;
+  // مقارنة ثابتة الزمن
+  uint8_t diff = 0;
+  for (size_t i = 0; i < k.length(); i++) diff |= (uint8_t)(k[i] ^ g_localKey[i]);
+  return diff == 0;
+}
+
+void denyUnauthed() { server.send(401, "application/json", "{\"ok\":false,\"error\":\"bad_key\"}"); }
+
+// ── GET /ecm/info ─────────────────────────────────────────────
+void handleInfo() {
+  if (!authed()) { denyUnauthed(); return; }
+
+  String json = "{";
+  json += "\"ok\":true";
+  json += ",\"serial\":\""  + g_serial + "\"";
+  json += ",\"model\":\""   + String(FW_MODEL) + "\"";
+  json += ",\"version\":\"" + String(FW_VERSION) + "\"";
+  json += ",\"mac\":\""     + WiFi.macAddress() + "\"";
+  json += ",\"ip\":\""      + WiFi.localIP().toString() + "\"";
+  json += ",\"rssi\":"      + String(WiFi.RSSI());
+  json += ",\"uptime\":"    + String(millis() / 1000);
+  json += ",\"free\":"      + String(ESP.getFreeSketchSpace());
+  json += "}";
+  server.send(200, "application/json", json);
+}
+
+// ── POST /ecm/update ──────────────────────────────────────────
+// التطبيق بيبعت الملف multipart، والـ MD5 في هيدر X-ECM-MD5
+void handleUpdateDone() {
+  if (!authed()) { denyUnauthed(); return; }
+
+  bool ok = !Update.hasError();
+  String json = ok
+    ? "{\"ok\":true,\"message\":\"تم — إعادة تشغيل\"}"
+    : String("{\"ok\":false,\"error\":\"") + Update.errorString() + "\"}";
+
+  server.sendHeader("Connection", "close");
+  server.send(ok ? 200 : 500, "application/json", json);
+
+  if (ok) { delay(400); ESP.restart(); }
+}
+
+void handleUpdateUpload() {
+  HTTPUpload& up = server.upload();
+
+  if (up.status == UPLOAD_FILE_START) {
+    if (!authed()) return;                       // handleUpdateDone هيرد بـ 401
+
+    Serial.printf("[OTA] بدأ: %s\n", up.filename.c_str());
+
+    if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
+      Update.printError(Serial);
+      return;
     }
-    prefs.remove("pending");
-  } else {
-    otaReport("idle", FW_VERSION);           // heartbeat عادي
+    // لو التطبيق بعت الـ MD5، المكتبة هتتحقق منه قبل ما تعتمد الصورة
+    if (server.hasHeader("X-ECM-MD5")) {
+      String md5 = server.header("X-ECM-MD5");
+      md5.toLowerCase();
+      if (md5.length() == 32) Update.setMD5(md5.c_str());
+    }
+
+  } else if (up.status == UPLOAD_FILE_WRITE) {
+    if (Update.write(up.buf, up.currentSize) != up.currentSize) Update.printError(Serial);
+
+  } else if (up.status == UPLOAD_FILE_END) {
+    if (Update.end(true)) Serial.printf("[OTA] تم — %u bytes\n", up.totalSize);
+    else                  Update.printError(Serial);   // غالبًا MD5 مش مطابق
+
+  } else if (up.status == UPLOAD_FILE_ABORTED) {
+    Update.abort();
+    Serial.println("[OTA] اتلغى");
   }
-  prefs.end();
+}
+
+// ── POST /ecm/reboot ──────────────────────────────────────────
+void handleReboot() {
+  if (!authed()) { denyUnauthed(); return; }
+  server.send(200, "application/json", "{\"ok\":true}");
+  delay(300);
+  ESP.restart();
 }
 
 // ── setup / loop ─────────────────────────────────────────────
 void setup() {
   Serial.begin(115200);
+  loadIdentity();
 
   WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
-  for (int i = 0; i < 40 && WiFi.status() != WL_CONNECTED; i++) delay(250);
+  WiFi.begin(LAN_SSID, LAN_PASS);
+  for (int i = 0; i < 60 && WiFi.status() != WL_CONNECTED; i++) delay(250);
 
-  configTime(0, 0, "pool.ntp.org");          // مهم: TLS محتاج وقت صح
-  for (int i = 0; i < 20 && time(nullptr) < 100000; i++) delay(250);
+  Serial.printf("[ECM] %s v%s | %s | %s\n",
+                FW_MODEL, FW_VERSION, g_serial.c_str(),
+                WiFi.localIP().toString().c_str());
 
-  Serial.printf("[ECM] %s v%s | %s\n", FW_MODEL, FW_VERSION, WiFi.localIP().toString().c_str());
+  // عشان التطبيق يلاقي البورده من غير ما تكتب الـ IP: http://ecm-<serial>.local
+  if (MDNS.begin(("ecm-" + g_serial).c_str())) {
+    MDNS.addService("ecm-ota", "tcp", 80);
+    MDNS.addServiceTxt("ecm-ota", "tcp", "model", FW_MODEL);
+    MDNS.addServiceTxt("ecm-ota", "tcp", "ver", FW_VERSION);
+    MDNS.addServiceTxt("ecm-ota", "tcp", "sn", g_serial.c_str());
+  }
 
-  otaConfirmBoot();
-  otaCheck();
-  g_nextCheck = millis() + (unsigned long) g_checkIn * 1000UL;
+  // لازم نقول للمكتبة تحتفظ بالهيدرات اللي محتاجينها
+  const char* keep[] = { "X-ECM-Key", "X-ECM-MD5" };
+  server.collectHeaders(keep, 2);
+
+  server.on("/ecm/info",   HTTP_GET,  handleInfo);
+  server.on("/ecm/reboot", HTTP_POST, handleReboot);
+  server.on("/ecm/update", HTTP_POST, handleUpdateDone, handleUpdateUpload);
+  server.begin();
+
+  Serial.println("[ECM] مستقبِل التحديث المحلي شغّال على المنفذ 80");
 }
 
 void loop() {
-  if ((long)(millis() - g_nextCheck) >= 0) {
-    otaCheck();
-    g_nextCheck = millis() + (unsigned long) g_checkIn * 1000UL;
-  }
-  // ... باقي شغل الجهاز
+  server.handleClient();
+  // ... باقي شغل البورده
 }
 ```
 
 ---
 
-## 4. ESP8266 — الفروق
+## 3. ESP8266 — الفروق
 
-- `#include <ESP8266WiFi.h>` و `<ESP8266HTTPClient.h>` و `<ESP8266httpUpdate.h>`
-- الكائن اسمه `ESPhttpUpdate` مش `httpUpdate`
-- الفلاش لازم يكون فيه مساحة للـ OTA — اختار تقسيمة `4MB (FS:1MB OTA:~1019KB)`
-- لو الشهادة صعبة، استخدم `client.setInsecure()` أو `setFingerprint()`
-
----
-
-## 5. تقسيمة الفلاش (ESP32)
-
-في Arduino IDE: **Tools → Partition Scheme → Default 4MB with spiffs (1.2MB APP / 1.5MB SPIFFS)**
-الحجم ده بيسيب `ota_0` و `ota_1` — من غيرهم التحديث عن بُعد مش هيشتغل.
-قارن حجم الـ `.bin` بمساحة الـ app partition قبل ما ترفعه على اللوحة.
+- `#include <ESP8266WiFi.h>` · `<ESP8266WebServer.h>` · `<ESP8266mDNS.h>`
+- الكلاس اسمه `ESP8266WebServer` مش `WebServer`
+- `Update.begin(maxSketchSpace)` — احسبها بـ `(ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000`
+- `esp_random()` مش موجودة — استخدم `RANDOM_REG32` أو `os_random()`
+- تقسيمة الفلاش لازم تسيب مساحة للتحديث: `4MB (FS:1MB OTA:~1019KB)`
 
 ---
 
-## 6. خطوات النشر الآمنة
+## 4. تقسيمة الفلاش (ESP32)
 
-1. ارفع الإصدار من **لوحة ECM → 📡 التحديث عن بُعد** على قناة `beta` بنسبة طرح `100%`.
-2. ثبّت الإصدار (📌 pin) على جهاز أو اتنين عندك واختبره فعليًا.
-3. ارفعه على `stable` بنسبة **10%** → راقب عمود ✔/✖ في جدول الإصدارات.
-4. لو النتايج كويسة، زوّد لـ 50% وبعدين 100%.
-5. لو ظهر فشل: **شيل علامة «فعّال»** عن الإصدار فورًا — الأجهزة اللي لسه ماحدّثتش هتفضل على القديم.
-
-للرجوع لنسخة أقدم على جهاز بعينه: اكتب رقم الإصدار القديم في خانة «إصدار مثبّت» جنب الجهاز.
+Arduino IDE → **Tools → Partition Scheme → Default 4MB with spiffs (1.2MB APP / 1.5MB SPIFFS)**
+لازم يكون فيه `ota_0` و `ota_1` — من غيرهم `Update.begin()` هتفشل.
+قارن حجم الـ `.bin` بـ `ESP.getFreeSketchSpace()` (بيرجع في `/ecm/info`) قبل ما تبعت.
 
 ---
 
-## 7. الأمان
+## 5. تجهيز السيريال
 
-- التوثيق بتوكن الجهاز مفعّل افتراضيًا. متقفلوش إلا وانت فاهم إنك بتسمح لأي حد يسأل عن الفيرموير.
-- روابط التنزيل موقّعة بـ HMAC-SHA256 ومربوطة بـ (الإصدار + السيريال + وقت الانتهاء).
-- مجلد الفيرموير اسمه عشوائي ومحمي بـ `.htaccess`. على nginx ضيف كمان:
+السيريال بيتكتب مرة واحدة في الـ NVS وقت التجهيز:
 
-```nginx
-location ~* /wp-content/uploads/ecm-firmware-.*\.bin$ { deny all; return 404; }
+```cpp
+prefs.begin("ecm", false);
+prefs.putString("serial", "ECM-0001");
+prefs.end();
 ```
 
-- التحقق من MD5 بيحصل على الجهاز قبل ما الصورة تتعتمد. لأمان أعلى فعّل **Secure Boot + Flash Encryption** على الـ ESP32 وامضِ الصور بمفتاحك.
+نفس السيريال لازم يكون مضاف في **لوحة ECM → 🛡️ حماية الأجهزة** عشان التحديثات تتربط بيه.
+
+---
+
+## 6. المفتاح المحلي
+
+أول تشغيل البورده بتولّد مفتاح عشوائي وبتطبعه على الـ Serial.
+التطبيق بيحفظه أول مرة يتجوّز مع البورده، وبعد كده بيبعته في هيدر `X-ECM-Key`.
+
+الشبكة دي مقفولة أصلاً، فالمفتاح ده غرضه الأساسي منع **الغلط** — إن تطبيق تاني على نفس الشبكة يرفع فيرموير على بورده مش بتاعته. لو عايز حماية حقيقية ضد مهاجم جوّه الشبكة، فعّل **Secure Boot + Flash Encryption** وامضِ الصور بمفتاحك.

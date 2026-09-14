@@ -65,6 +65,14 @@ $steps = [
             <a href="<?php echo esc_url( home_url( '/#contact' ) ); ?>" class="ecm-btn-primary">تواصل معنا</a>
             <a href="<?php echo esc_url( home_url( '/' ) ); ?>" class="ecm-btn-ghost">كل الأنظمة</a>
         </div>
+        <?php $gpmap_page = function_exists( 'ecm_page_by_title' ) ? ecm_page_by_title( 'خريطة أزرار الجويستيك' ) : null; ?>
+        <?php if ( $gpmap_page ) : ?>
+            <p style="margin-top:22px;">
+                <a href="<?php echo esc_url( get_permalink( $gpmap_page->ID ) ); ?>" style="color:var(--ecm-grey-light); font-size:14px; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+                    🎮 خريطة أزرار الجويستيك الافتراضية
+                </a>
+            </p>
+        <?php endif; ?>
     </section>
 
     <section class="ecm-container" style="padding-bottom: 48px;">

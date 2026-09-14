@@ -31,7 +31,7 @@ function ecm_page_by_title( $title ) {
 function ecm_ensure_pages() {
     // لو الأدمن مش داخل — لا تشغّل
     if ( ! is_admin() && ! wp_doing_cron() ) return;
-    if ( get_option( 'ecm_pages_created_v6' ) ) return;
+    if ( get_option( 'ecm_pages_created_v7' ) ) return;
 
     // ── صفحة رئيسية ──
     $front_page = ecm_page_by_title( 'ECM Home' );
@@ -136,6 +136,7 @@ function ecm_ensure_pages() {
         'التحكم في المركبة'   => 'page-vehicle-control.php',
         'لوحة المفاتيح'       => 'page-relay-panel.php',
         'التحكم بذراع الألعاب' => 'page-gamepad.php',
+        'خريطة أزرار الجويستيك' => 'page-gamepad-map.php',
     ];
     foreach ( $system_pages as $title => $template ) {
         $existing = ecm_page_by_title( $title );
@@ -154,13 +155,13 @@ function ecm_ensure_pages() {
         }
     }
 
-    update_option( 'ecm_pages_created_v6', true );
+    update_option( 'ecm_pages_created_v7', true );
 }
 add_action( 'init', 'ecm_ensure_pages' );
 
 // لو فعّل الثيم من جديد — أعد الإنشاء
 function ecm_theme_activate() {
-    delete_option( 'ecm_pages_created_v6' );
+    delete_option( 'ecm_pages_created_v7' );
 }
 add_action( 'after_switch_theme', 'ecm_theme_activate' );
 
@@ -180,6 +181,7 @@ function ecm_get_expected_pages() {
         [ 'التحكم في المركبة',      'page-vehicle-control.php',  false ],
         [ 'لوحة المفاتيح',          'page-relay-panel.php',      false ],
         [ 'التحكم بذراع الألعاب',   'page-gamepad.php',          false ],
+        [ 'خريطة أزرار الجويستيك',  'page-gamepad-map.php',      false ],
     ];
 }
 
@@ -261,7 +263,7 @@ function ecm_handle_rebuild_pages() {
     }
     check_admin_referer( 'ecm_rebuild_pages_nonce' );
 
-    delete_option( 'ecm_pages_created_v6' );
+    delete_option( 'ecm_pages_created_v7' );
     ecm_ensure_pages(); // بيعمل الناقص بس — مش بيلمس الموجود
 
     wp_safe_redirect( admin_url( 'admin.php?page=ecm-dashboard&ecm_pages_rebuilt=1' ) );
@@ -376,7 +378,7 @@ add_action( 'wp_enqueue_scripts', 'ecm_enqueue_assets' );
 
 
 // ── THEME VERSION CONSTANT ───────────────────────────────────
-define( 'ECM_VERSION', '3.0.67' );
+define( 'ECM_VERSION', '3.0.68' );
 
 
 // ── INCLUDE: FRONT PAGE CUSTOMIZER ──────────────────────────

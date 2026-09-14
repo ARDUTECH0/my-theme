@@ -141,7 +141,9 @@ function ecm_ota_admin_page() {
             'require_known' => empty( $_POST['ota_require_known'] ) ? 0 : 1,
             'check_in'      => max( 60, (int) ( $_POST['ota_check_in'] ?? 21600 ) ),
             'link_ttl'      => max( 60, (int) ( $_POST['ota_link_ttl'] ?? 900 ) ),
+            'app_link_ttl'  => max( 300, (int) ( $_POST['ota_app_link_ttl'] ?? 86400 ) ),
             'offline_after' => max( 300, (int) ( $_POST['ota_offline_after'] ?? 172800 ) ),
+            'catalog_depth' => max( 1, min( 20, (int) ( $_POST['ota_catalog_depth'] ?? 5 ) ) ),
         ] );
         $notices[] = [ 'success', __( 'تم حفظ إعدادات التحديث ✅', 'ecm-theme' ) ];
     }
@@ -223,7 +225,20 @@ function ecm_ota_admin_page() {
 
     <div class="wrap ecm-ota">
         <h1>📡 <?php esc_html_e( 'التحديث عن بُعد للأجهزة — OTA', 'ecm-theme' ); ?></h1>
-        <p class="description"><?php esc_html_e( 'ارفع فيرموير ESP32/ESP8266، حدّد القناة ونسبة الطرح، وتابع الأجهزة وهي بتتحدّث.', 'ecm-theme' ); ?></p>
+        <p class="description"><?php esc_html_e( 'ارفع فيرموير ESP32/ESP8266، حدّد القناة ونسبة الطرح، وتابع البوردات وهي بتتحدّث.', 'ecm-theme' ); ?></p>
+
+        <div class="notice notice-info inline" style="margin:14px 0;">
+            <p style="margin:8px 0;">
+                <strong><?php esc_html_e( 'إزاي التحديث بيوصل للبورده؟', 'ecm-theme' ); ?></strong><br>
+                <?php esc_html_e( 'البوردات شغّالة على شبكة داخلية من غير إنترنت — التطبيق هو الوسيط:', 'ecm-theme' ); ?>
+            </p>
+            <p style="margin:8px 0;font-family:monospace;direction:ltr;text-align:left;">
+                [<?php esc_html_e( 'الموقع', 'ecm-theme' ); ?>] ──<?php esc_html_e( 'إنترنت', 'ecm-theme' ); ?>──&gt; [<?php esc_html_e( 'التطبيق', 'ecm-theme' ); ?>] ──<?php esc_html_e( 'شبكة داخلية', 'ecm-theme' ); ?>──&gt; [<?php esc_html_e( 'البورده', 'ecm-theme' ); ?>]
+            </p>
+            <p style="margin:8px 0;">
+                <?php esc_html_e( 'التطبيق بينزّل الـ .bin ويخزّنه عنده، يدخل على شبكة البورده ويرفعه عليها محليًا، وبعدين يرجع يبلّغنا بالنتيجة. يعني البيانات اللي تحت بتتحدّث لما التطبيق يبلّغ — مش لحظيًا من البورده.', 'ecm-theme' ); ?>
+            </p>
+        </div>
 
         <?php foreach ( $notices as $n ) : ?>
             <div class="notice notice-<?php echo esc_attr( $n[0] ); ?>"><p><?php echo esc_html( $n[1] ); ?></p></div>
@@ -235,7 +250,7 @@ function ecm_ota_admin_page() {
 
         <div class="ecm-ota-stats">
             <div class="ecm-ota-card grey"><div class="n"><?php echo (int) $stats['devices']; ?></div><div class="l"><?php esc_html_e( 'إجمالي الأجهزة', 'ecm-theme' ); ?></div></div>
-            <div class="ecm-ota-card green"><div class="n"><?php echo (int) $stats['online']; ?></div><div class="l"><?php esc_html_e( 'ظهرت مؤخرًا', 'ecm-theme' ); ?></div></div>
+            <div class="ecm-ota-card green"><div class="n"><?php echo (int) $stats['online']; ?></div><div class="l"><?php esc_html_e( 'جالها بلاغ مؤخرًا', 'ecm-theme' ); ?></div></div>
             <div class="ecm-ota-card blue"><div class="n"><?php echo (int) $stats['updating']; ?></div><div class="l"><?php esc_html_e( 'بتتحدّث دلوقتي', 'ecm-theme' ); ?></div></div>
             <div class="ecm-ota-card red"><div class="n"><?php echo (int) $stats['failed']; ?></div><div class="l"><?php esc_html_e( 'تحديث فشل', 'ecm-theme' ); ?></div></div>
             <div class="ecm-ota-card orange"><div class="n"><?php echo (int) $stats['releases']; ?></div><div class="l"><?php esc_html_e( 'إصدارات فعّالة', 'ecm-theme' ); ?></div></div>
@@ -378,7 +393,7 @@ function ecm_ota_admin_page() {
                         <th><?php esc_html_e( 'الجهاز', 'ecm-theme' ); ?></th>
                         <th><?php esc_html_e( 'الإصدار الحالي', 'ecm-theme' ); ?></th>
                         <th><?php esc_html_e( 'الحالة', 'ecm-theme' ); ?></th>
-                        <th><?php esc_html_e( 'آخر ظهور', 'ecm-theme' ); ?></th>
+                        <th><?php esc_html_e( 'آخر بلاغ', 'ecm-theme' ); ?></th>
                         <th><?php esc_html_e( 'القناة / تثبيت إصدار', 'ecm-theme' ); ?></th>
                         <th></th>
                     </tr>
@@ -401,8 +416,20 @@ function ecm_ota_admin_page() {
                             <div style="color:#646970;font-size:12px;">
                                 <code><?php echo esc_html( $d->model ); ?></code>
                                 <?php if ( $d->mac ) : ?> · <?php echo esc_html( $d->mac ); ?><?php endif; ?>
+                                <?php if ( $d->local_ip ) : ?> · <?php echo esc_html( $d->local_ip ); ?><?php endif; ?>
                                 <?php if ( $d->rssi ) : ?> · <?php echo (int) $d->rssi; ?>dBm<?php endif; ?>
                             </div>
+                            <?php
+                            if ( 'app' === $d->via ) {
+                                $who = $d->app_user_id ? get_userdata( (int) $d->app_user_id ) : null;
+                                printf(
+                                    '<span class="ecm-pill beta">📱 %s</span>',
+                                    esc_html( $who ? sprintf( __( 'عن طريق %s', 'ecm-theme' ), $who->display_name ) : __( 'عن طريق التطبيق', 'ecm-theme' ) )
+                                );
+                            } else {
+                                echo '<span class="ecm-pill off">🌐 ' . esc_html__( 'اتصال مباشر', 'ecm-theme' ) . '</span>';
+                            }
+                            ?>
                         </td>
                         <td>
                             <?php echo $d->fw_version ? esc_html( $d->fw_version ) : '—'; ?>
@@ -417,7 +444,7 @@ function ecm_ota_admin_page() {
                             <?php endif; ?>
                         </td>
                         <td>
-                            <span class="ecm-pill <?php echo $is_on ? 'on' : 'off'; ?>"><?php echo $is_on ? esc_html__( 'متصل', 'ecm-theme' ) : esc_html__( 'أوفلاين', 'ecm-theme' ); ?></span>
+                            <span class="ecm-pill <?php echo $is_on ? 'on' : 'off'; ?>"><?php echo $is_on ? esc_html__( 'متابَعة', 'ecm-theme' ) : esc_html__( 'مالهاش بلاغ من زمان', 'ecm-theme' ); ?></span>
                             <div style="color:#646970;font-size:12px;"><?php echo esc_html( ecm_ota_ago( $d->last_seen ) ); ?></div>
                         </td>
                         <td>
@@ -462,17 +489,27 @@ function ecm_ota_admin_page() {
                 <p>
                     <label><input type="checkbox" name="ota_require_known" value="1" <?php checked( (int) $opts['require_known'], 1 ); ?>> <?php esc_html_e( 'لو التوكن مقفول: اقبل السيريالات المسجّلة كأصلية بس', 'ecm-theme' ); ?></label>
                 </p>
-                <div class="ecm-ota-grid" style="max-width:760px;">
+                <div class="ecm-ota-grid" style="max-width:900px;">
                     <div>
-                        <label><?php esc_html_e( 'كل قد إيه الجهاز يسأل (ثانية)', 'ecm-theme' ); ?></label>
+                        <label><?php esc_html_e( 'كل قد إيه التطبيق يسأل (ثانية)', 'ecm-theme' ); ?></label>
                         <input type="number" name="ota_check_in" value="<?php echo (int) $opts['check_in']; ?>" min="60">
                     </div>
                     <div>
-                        <label><?php esc_html_e( 'صلاحية رابط التنزيل (ثانية)', 'ecm-theme' ); ?></label>
+                        <label><?php esc_html_e( 'صلاحية رابط التنزيل للتطبيق (ثانية)', 'ecm-theme' ); ?></label>
+                        <input type="number" name="ota_app_link_ttl" value="<?php echo (int) $opts['app_link_ttl']; ?>" min="300">
+                        <p class="description"><?php esc_html_e( 'خليها طويلة — التطبيق ممكن ينزّل النهاردة ويرفع على البورده بكرة.', 'ecm-theme' ); ?></p>
+                    </div>
+                    <div>
+                        <label><?php esc_html_e( 'عدد الإصدارات في الكتالوج (لكل قناة)', 'ecm-theme' ); ?></label>
+                        <input type="number" name="ota_catalog_depth" value="<?php echo (int) $opts['catalog_depth']; ?>" min="1" max="20">
+                        <p class="description"><?php esc_html_e( 'التطبيق بينزّلهم عنده عشان يشتغل أوفلاين ويقدر يرجّع نسخة أقدم.', 'ecm-theme' ); ?></p>
+                    </div>
+                    <div>
+                        <label><?php esc_html_e( 'صلاحية الرابط للبورده المباشرة (ثانية)', 'ecm-theme' ); ?></label>
                         <input type="number" name="ota_link_ttl" value="<?php echo (int) $opts['link_ttl']; ?>" min="60">
                     </div>
                     <div>
-                        <label><?php esc_html_e( 'يُعتبر أوفلاين بعد (ثانية)', 'ecm-theme' ); ?></label>
+                        <label><?php esc_html_e( 'تُعتبر أوفلاين بعد (ثانية)', 'ecm-theme' ); ?></label>
                         <input type="number" name="ota_offline_after" value="<?php echo (int) $opts['offline_after']; ?>" min="300">
                     </div>
                 </div>
@@ -483,13 +520,23 @@ function ecm_ota_admin_page() {
         <!-- ══ نقاط الاتصال ══ -->
         <div class="ecm-ota-box ecm-ota-ep">
             <h2>🔌 <?php esc_html_e( 'نقاط الاتصال — للمبرمج', 'ecm-theme' ); ?></h2>
-            <p><?php esc_html_e( 'الجهاز بيستخدم دول. التوكن بتاع كل جهاز بيتولّد لما العميل يربط السيريال بحسابه.', 'ecm-theme' ); ?></p>
-            <code>GET <?php echo esc_html( rest_url( 'ecm/v1/ota/check' ) ); ?>?serial=SERIAL&amp;token=DEVICE_TOKEN&amp;version=1.0.0&amp;model=default</code>
-            <code>POST <?php echo esc_html( rest_url( 'ecm/v1/ota/report' ) ); ?> — serial, token, version, status=success|failed, error</code>
+            <p><strong><?php esc_html_e( 'التطبيق (المسار الأساسي)', 'ecm-theme' ); ?></strong> — <?php esc_html_e( 'التوثيق بتوكن المستخدم اللي بيرجع من /app/login، أو هيدر X-ECM-App-Token.', 'ecm-theme' ); ?></p>
+            <code>GET <?php echo esc_html( rest_url( 'ecm/v1/ota/app/catalog' ) ); ?>?token=APP_TOKEN&amp;model=default</code>
+            <code>GET <?php echo esc_html( rest_url( 'ecm/v1/ota/app/check' ) ); ?>?token=APP_TOKEN&amp;serial=SERIAL&amp;version=1.0.0&amp;model=default</code>
+            <code>POST <?php echo esc_html( rest_url( 'ecm/v1/ota/app/report' ) ); ?> — token, serial, version, status=success|failed, error, local_ip</code>
+
+            <p style="margin-top:16px;"><strong><?php esc_html_e( 'بورده ليها إنترنت (احتياطي)', 'ecm-theme' ); ?></strong> — <?php esc_html_e( 'بتوكن الجهاز من صفحة السيريالات.', 'ecm-theme' ); ?></p>
+            <code>GET <?php echo esc_html( rest_url( 'ecm/v1/ota/check' ) ); ?>?serial=SERIAL&amp;token=DEVICE_TOKEN&amp;version=1.0.0</code>
+            <code>POST <?php echo esc_html( rest_url( 'ecm/v1/ota/report' ) ); ?> — serial, token, version, status, error</code>
+
+            <p style="margin-top:16px;"><strong><?php esc_html_e( 'للوحة', 'ecm-theme' ); ?></strong></p>
             <code>GET <?php echo esc_html( rest_url( 'ecm/v1/ota/fleet' ) ); ?> — <?php esc_html_e( 'يحتاج هيدر X-ECM-Token (توكن الـ API)', 'ecm-theme' ); ?></code>
-            <p class="description">
-                <?php esc_html_e( 'رابط التنزيل بيرجع من /ota/check موقّع ومربوط بالجهاز وبينتهي بعد المدة اللي فوق — مفيش رابط ثابت للفيرموير.', 'ecm-theme' ); ?>
-                <?php esc_html_e( 'كود الـ ESP32 الكامل موجود في:', 'ecm-theme' ); ?> <code style="display:inline;">docs/esp32-ota-client.md</code>
+
+            <p class="description" style="margin-top:14px;">
+                <?php esc_html_e( 'روابط التنزيل بترجع موقّعة ومربوطة بالحساب وبتنتهي بعد المدة المضبوطة، وبتدعم الاستكمال (Range) عشان شبكة الموبايل — مفيش رابط ثابت للفيرموير.', 'ecm-theme' ); ?><br>
+                <?php esc_html_e( 'كود التطبيق وكود البورده الكامل في:', 'ecm-theme' ); ?>
+                <code style="display:inline;">docs/ota-app-flow.md</code> ·
+                <code style="display:inline;">docs/esp32-ota-client.md</code>
             </p>
         </div>
 

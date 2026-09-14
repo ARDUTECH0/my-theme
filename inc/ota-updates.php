@@ -1,17 +1,30 @@
 <?php
 /**
- * ECM — نظام التحديث عن بُعد للأجهزة (ESP32 / ESP8266 OTA)
+ * ECM — نظام التحديث عن بُعد للأجهزة (ESP32 / ESP8266)
+ *
+ * المعمارية: البورده شغّالة على شبكة داخلية من غير إنترنت.
+ * التطبيق هو اللي عنده إنترنت — بينزّل الفيرموير من الموقع، يخزّنه عنده،
+ * وبعدين يدخل على شبكة البورده ويرفعه عليها محليًا، وبيرجع يبلّغ الموقع بالنتيجة.
+ *
+ *   [ووردبريس] ←── إنترنت ──→ [التطبيق] ←── شبكة داخلية ──→ [البورده — أوفلاين]
  *
  * - رفع ملفات الفيرموير (.bin) في مجلد محمي — مش قابل للتنزيل المباشر.
  * - قنوات إصدار (stable / beta / dev) + طرح تدريجي (rollout %) + تحديث إجباري.
- * - كل جهاز بيسجّل نفسه (serial + chip id) وبيقول إصداره الحالي وحالته.
- * - تثبيت إصدار معيّن لجهاز بعينه (pin) للتجارب أو الرجوع لنسخة أقدم.
- * - روابط تنزيل موقّعة بـ HMAC وبتنتهي بعد مدة — مربوطة بالجهاز نفسه.
+ * - كتالوج إصدارات كامل عشان التطبيق ينزّل أكتر من نسخة ويشتغل أوفلاين بعدها.
+ * - روابط تنزيل موقّعة بـ HMAC وبتنتهي بعد مدة، وبتدعم الاستكمال (Range).
+ * - التطبيق بيبلّغ نيابةً عن البورده — وده اللي بيغذّي لوحة الأسطول.
  *
  * Endpoints (ecm/v1):
- *   GET  /ota/check     — الجهاز يسأل: فيه تحديث؟
- *   GET  /ota/download  — تنزيل الـ .bin برابط موقّع
- *   POST /ota/report    — الجهاز يبلّغ بنتيجة التحديث
+ *   المسار الأساسي — عن طريق التطبيق:
+ *     GET  /ota/app/catalog  — كل الإصدارات المتاحة + روابط تنزيلها
+ *     GET  /ota/app/check    — فيه تحديث للبورده دي؟
+ *     POST /ota/app/report   — نتيجة الرفع على البورده (relay)
+ *   مسار احتياطي — لو البورده نفسها ليها إنترنت:
+ *     GET  /ota/check    · POST /ota/report
+ *   مشترك:
+ *     GET  /ota/download — تنزيل الـ .bin برابط موقّع
+ *   للوحة:
+ *     GET  /ota/fleet
  *
  * @package ecm-theme
  */
@@ -36,7 +49,7 @@ function ecm_ota_devices_table(): string {
 
 /** إنشاء/تحديث الجداول */
 function ecm_ota_install() {
-    if ( get_option( 'ecm_ota_db_v1' ) ) {
+    if ( get_option( 'ecm_ota_db_v2' ) ) {
         return;
     }
     global $wpdb;
@@ -79,6 +92,9 @@ function ecm_ota_install() {
         pin_version VARCHAR(32) NOT NULL DEFAULT '',
         status VARCHAR(20) NOT NULL DEFAULT 'idle',
         last_error VARCHAR(191) NOT NULL DEFAULT '',
+        via VARCHAR(10) NOT NULL DEFAULT 'app',
+        app_user_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+        local_ip VARCHAR(45) NOT NULL DEFAULT '',
         ip VARCHAR(45) NOT NULL DEFAULT '',
         rssi INT NOT NULL DEFAULT 0,
         uptime BIGINT UNSIGNED NOT NULL DEFAULT 0,
@@ -91,7 +107,7 @@ function ecm_ota_install() {
         KEY model (model,channel)
     ) {$charset};" );
 
-    update_option( 'ecm_ota_db_v1', 1 );
+    update_option( 'ecm_ota_db_v2', 1 );
 }
 add_action( 'admin_init', 'ecm_ota_install' );
 add_action( 'init', 'ecm_ota_install' );
@@ -109,7 +125,7 @@ function ecm_ota_dir(): array {
     if ( ! file_exists( $path ) ) {
         wp_mkdir_p( $path );
     }
-    // منع التصفّح/التنزيل المباشر (Apache) — وعلى nginx الاسم عشوائي والتنزيل بيعدّي على REST
+    // منع التنزيل المباشر (Apache) — وعلى nginx الاسم عشوائي والتنزيل بيعدّي على REST
     if ( ! file_exists( $path . '/.htaccess' ) ) {
         file_put_contents( $path . '/.htaccess', "Require all denied\n<IfModule !mod_authz_core.c>\nDeny from all\n</IfModule>\n" );
     }
@@ -143,11 +159,13 @@ function ecm_ota_file_path( string $file_name ): string {
 function ecm_ota_opts(): array {
     return wp_parse_args( (array) get_option( 'ecm_ota_opts', [] ), [
         'enabled'       => 1,
-        'require_auth'  => 1,      // لازم توكن الجهاز من جدول السيريالات
-        'require_known' => 0,      // لازم السيريال يكون مسجّل كأصلي
-        'check_in'      => 21600,  // الجهاز يسأل كل قد إيه (ثواني) — 6 ساعات
-        'link_ttl'      => 900,    // صلاحية رابط التنزيل (ثواني)
+        'require_auth'  => 1,      // المسار المباشر: لازم توكن الجهاز
+        'require_known' => 0,      // المسار المباشر: لازم السيريال يكون مسجّل كأصلي
+        'check_in'      => 21600,  // التطبيق يسأل كل قد إيه (ثواني) — 6 ساعات
+        'link_ttl'      => 900,    // صلاحية رابط التنزيل للبورده المباشرة
+        'app_link_ttl'  => 86400,  // صلاحية رابط التنزيل للتطبيق — أطول، التنزيل ممكن يتأجّل
         'offline_after' => 172800, // يُعتبر أوفلاين بعد (ثواني) — يومين
+        'catalog_depth' => 5,      // كام إصدار يرجع في الكتالوج لكل قناة
     ] );
 }
 
@@ -189,10 +207,10 @@ function ecm_ota_ip(): string {
 }
 
 /**
- * خنق بسيط لمنع إغراق الـ endpoints (جهاز عيّان بيسأل في لوب، أو حد بيلعب).
+ * خنق بسيط لمنع إغراق الـ endpoints.
  * يرجّع true لو الطلب مسموح.
  */
-function ecm_ota_throttle( string $bucket, int $max = 30, int $window = 600 ): bool {
+function ecm_ota_throttle( string $bucket, int $max = 40, int $window = 600 ): bool {
     $ip = ecm_ota_ip();
     if ( '' === $ip ) {
         return true;
@@ -269,14 +287,47 @@ function ecm_ota_stats(): array {
 
 
 // ════════════════════════════════════════════════════════════
-// §3  هوية الجهاز + الروابط الموقّعة
+// §3  الهوية + الروابط الموقّعة
 // ════════════════════════════════════════════════════════════
 
 /**
- * التحقق من هوية الجهاز الطالب.
+ * توثيق التطبيق — بتوكن المستخدم اللي بيرجع من /app/login.
+ * يرجّع [ 'ok' => bool, 'user' => WP_User|null, 'error' => string ]
+ */
+function ecm_ota_app_auth( $request ): array {
+    $token = sanitize_text_field( (string) $request->get_param( 'token' ) );
+    if ( '' === $token && ! empty( $_SERVER['HTTP_X_ECM_APP_TOKEN'] ) ) {
+        $token = sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_ECM_APP_TOKEN'] ) );
+    }
+    if ( '' === $token || ! function_exists( 'ecm_user_from_app_token' ) ) {
+        return [ 'ok' => false, 'user' => null, 'error' => 'missing_token' ];
+    }
+    $user = ecm_user_from_app_token( $token );
+    if ( ! $user ) {
+        return [ 'ok' => false, 'user' => null, 'error' => 'invalid_token' ];
+    }
+    return [ 'ok' => true, 'user' => $user, 'error' => '' ];
+}
+
+/**
+ * هل السيريال ده بتاع المستخدم ده؟
+ * لو السيريال مش مربوط بأي حساب بنسمح (بورده لسه ما اتفعلتش) — بس مش لو مربوط بحساب تاني.
+ */
+function ecm_ota_user_owns_serial( int $user_id, string $serial ): bool {
+    if ( '' === $serial || ! function_exists( 'ecm_serial_find' ) ) {
+        return true;
+    }
+    $row = ecm_serial_find( $serial );
+    if ( ! $row ) {
+        return ! (int) ( ecm_ota_opts()['require_known'] ?? 0 );
+    }
+    $owner = (int) $row->user_id;
+    return 0 === $owner || $owner === $user_id;
+}
+
+/**
+ * توثيق البورده نفسها (المسار الاحتياطي — لو ليها إنترنت).
  * يرجّع [ 'ok' => bool, 'serial' => string, 'error' => string ]
- *
- * الترتيب: توكن الجهاز من جدول السيريالات (الأقوى) ← السيريال لوحده (لو الأمان مخفّف).
  */
 function ecm_ota_authenticate( $request ): array {
     $opts   = ecm_ota_opts();
@@ -289,7 +340,7 @@ function ecm_ota_authenticate( $request ): array {
         $token = sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_ECM_DEVICE_TOKEN'] ) );
     }
 
-    // (1) توكن الجهاز — بيحدّد السيريال لوحده، فمش محتاجين نثق في اللي الجهاز بعته
+    // (1) توكن الجهاز — بيحدّد السيريال لوحده، فمش محتاجين نثق في اللي البورده بعتته
     if ( '' !== $token && function_exists( 'ecm_serial_find_by_token' ) ) {
         $row = ecm_serial_find_by_token( $token );
         if ( $row ) {
@@ -312,37 +363,42 @@ function ecm_ota_authenticate( $request ): array {
     return [ 'ok' => true, 'serial' => $serial, 'error' => '' ];
 }
 
-/** توقيع رابط تنزيل مربوط بجهاز وإصدار وبينتهي بعد TTL */
-function ecm_ota_sign_download( int $release_id, string $serial, int $ttl = 0 ): string {
+/**
+ * توقيع رابط تنزيل.
+ * $subject = "u:<user_id>" للتطبيق، أو "d:<serial>" للبورده المباشرة.
+ */
+function ecm_ota_sign_download( int $release_id, string $subject, int $ttl = 0 ): string {
     $opts    = ecm_ota_opts();
-    $ttl     = $ttl > 0 ? $ttl : (int) $opts['link_ttl'];
+    if ( $ttl <= 0 ) {
+        $ttl = ( 0 === strpos( $subject, 'u:' ) ) ? (int) $opts['app_link_ttl'] : (int) $opts['link_ttl'];
+    }
     $expires = time() + max( 60, $ttl );
-    $payload = $release_id . '|' . $serial . '|' . $expires;
+    $payload = $release_id . '|' . $subject . '|' . $expires;
     $sig     = hash_hmac( 'sha256', $payload, ecm_ota_secret() );
 
     return add_query_arg( [
         'r' => $release_id,
-        's' => rawurlencode( $serial ),
+        's' => rawurlencode( $subject ),
         'e' => $expires,
         'k' => $sig,
     ], rest_url( 'ecm/v1/ota/download' ) );
 }
 
-/** التحقق من رابط التنزيل — يرجّع السيريال أو null */
+/** التحقق من رابط التنزيل — يرجّع [release_id, subject] أو null */
 function ecm_ota_verify_download( $request ): ?array {
     $release_id = (int) $request->get_param( 'r' );
-    $serial     = sanitize_text_field( rawurldecode( (string) $request->get_param( 's' ) ) );
+    $subject    = sanitize_text_field( rawurldecode( (string) $request->get_param( 's' ) ) );
     $expires    = (int) $request->get_param( 'e' );
     $sig        = (string) $request->get_param( 'k' );
 
     if ( ! $release_id || '' === $sig || $expires < time() ) {
         return null;
     }
-    $payload = $release_id . '|' . $serial . '|' . $expires;
+    $payload = $release_id . '|' . $subject . '|' . $expires;
     if ( ! hash_equals( hash_hmac( 'sha256', $payload, ecm_ota_secret() ), $sig ) ) {
         return null;
     }
-    return [ 'release_id' => $release_id, 'serial' => $serial ];
+    return [ 'release_id' => $release_id, 'subject' => $subject ];
 }
 
 /** تسجيل/تحديث الجهاز في الأسطول */
@@ -355,7 +411,8 @@ function ecm_ota_touch_device( string $serial, array $data = [] ) {
     $now   = current_time( 'mysql' );
 
     $fields = array_intersect_key( $data, array_flip( [
-        'chip_id', 'mac', 'model', 'channel', 'fw_version', 'status', 'last_error', 'ip', 'rssi', 'uptime',
+        'chip_id', 'mac', 'model', 'channel', 'fw_version', 'status', 'last_error',
+        'via', 'app_user_id', 'local_ip', 'ip', 'rssi', 'uptime',
     ] ) );
     $fields['last_seen'] = $now;
 
@@ -370,22 +427,95 @@ function ecm_ota_touch_device( string $serial, array $data = [] ) {
     ], $fields ) );
 }
 
+/**
+ * منطق «فيه تحديث ولا لأ» — مشترك بين مسار التطبيق ومسار البورده المباشرة.
+ * يرجّع [ 'update' => bool, 'release' => object|null, 'message' => string, 'latest' => string ]
+ */
+function ecm_ota_resolve_update( string $serial, string $model, string $channel, string $current, $device = null ): array {
+    $none = function ( $msg, $latest = '' ) {
+        return [ 'update' => false, 'release' => null, 'message' => $msg, 'latest' => $latest ];
+    };
+
+    $pinned = $device && '' !== (string) $device->pin_version;
+    $rel    = $pinned
+        ? ecm_ota_find_release( $model, (string) $device->pin_version )
+        : ecm_ota_latest_release( $model, $channel );
+
+    if ( ! $rel ) {
+        return $none( __( 'لا يوجد إصدار متاح لهذا الموديل', 'ecm-theme' ) );
+    }
+
+    if ( ! $pinned ) {
+        if ( '' !== $current && version_compare( $current, $rel->version, '>=' ) ) {
+            return $none( __( 'البورده على أحدث إصدار', 'ecm-theme' ), $rel->version );
+        }
+        if ( '' !== (string) $rel->min_version && '' !== $current
+            && version_compare( $current, $rel->min_version, '<' ) ) {
+            return $none(
+                sprintf( __( 'لازم تحدّث للإصدار %s الأول', 'ecm-theme' ), $rel->min_version ),
+                $rel->version
+            );
+        }
+        if ( ! ecm_ota_in_rollout( $serial, (int) $rel->id, (int) $rel->rollout ) ) {
+            return $none( __( 'خارج نسبة الطرح الحالية', 'ecm-theme' ), $rel->version );
+        }
+    } elseif ( '' !== $current && $current === $rel->version ) {
+        return $none( __( 'البورده على الإصدار المثبّت', 'ecm-theme' ), $rel->version );
+    }
+
+    if ( '' === ecm_ota_file_path( (string) $rel->file_name ) ) {
+        return $none( __( 'ملف الإصدار مفقود على السيرفر', 'ecm-theme' ) );
+    }
+
+    return [ 'update' => true, 'release' => $rel, 'message' => __( 'تحديث متاح', 'ecm-theme' ), 'latest' => $rel->version ];
+}
+
+/** تحويل صف إصدار لمصفوفة للـ API */
+function ecm_ota_release_payload( $rel, string $subject ): array {
+    return [
+        'version'   => $rel->version,
+        'model'     => $rel->model,
+        'channel'   => $rel->channel,
+        'url'       => ecm_ota_sign_download( (int) $rel->id, $subject ),
+        'md5'       => $rel->md5,
+        'sha256'    => $rel->sha256,
+        'size'      => (int) $rel->file_size,
+        'mandatory' => (bool) $rel->mandatory,
+        'notes'     => (string) $rel->notes,
+        'released'  => $rel->created_at,
+    ];
+}
+
 
 // ════════════════════════════════════════════════════════════
-// §4  REST API — الأجهزة
+// §4  REST API
 // ════════════════════════════════════════════════════════════
 
 add_action( 'rest_api_init', function () {
 
-    register_rest_route( 'ecm/v1', '/ota/check', [
+    // ── المسار الأساسي: التطبيق ──
+    register_rest_route( 'ecm/v1', '/ota/app/catalog', [
         'methods'             => 'GET',
-        'callback'            => 'ecm_rest_ota_check',
+        'callback'            => 'ecm_rest_ota_app_catalog',
         'permission_callback' => '__return_true',
     ] );
 
-    register_rest_route( 'ecm/v1', '/ota/download', [
-        'methods'             => [ 'GET', 'HEAD' ],
-        'callback'            => 'ecm_rest_ota_download',
+    register_rest_route( 'ecm/v1', '/ota/app/check', [
+        'methods'             => 'GET',
+        'callback'            => 'ecm_rest_ota_app_check',
+        'permission_callback' => '__return_true',
+    ] );
+
+    register_rest_route( 'ecm/v1', '/ota/app/report', [
+        'methods'             => 'POST',
+        'callback'            => 'ecm_rest_ota_app_report',
+        'permission_callback' => '__return_true',
+    ] );
+
+    // ── مسار احتياطي: بورده ليها إنترنت ──
+    register_rest_route( 'ecm/v1', '/ota/check', [
+        'methods'             => 'GET',
+        'callback'            => 'ecm_rest_ota_check',
         'permission_callback' => '__return_true',
     ] );
 
@@ -395,7 +525,14 @@ add_action( 'rest_api_init', function () {
         'permission_callback' => '__return_true',
     ] );
 
-    // للوحة الأدمن/التطبيق — يحتاج توكن الـ API
+    // ── مشترك ──
+    register_rest_route( 'ecm/v1', '/ota/download', [
+        'methods'             => [ 'GET', 'HEAD' ],
+        'callback'            => 'ecm_rest_ota_download',
+        'permission_callback' => '__return_true',
+    ] );
+
+    // ── للوحة/التقارير ──
     register_rest_route( 'ecm/v1', '/ota/fleet', [
         'methods'             => 'GET',
         'callback'            => 'ecm_rest_ota_fleet',
@@ -405,16 +542,188 @@ add_action( 'rest_api_init', function () {
     ] );
 } );
 
+
+// ── §4.1  مسار التطبيق ────────────────────────────────────────
+
 /**
- * GET /ecm/v1/ota/check
- * params: serial, token, version, model, channel, chip, mac, rssi, uptime
+ * GET /ecm/v1/ota/app/catalog?token=..&model=..
+ * كل الإصدارات المتاحة عشان التطبيق ينزّلها ويخزّنها قبل ما يروح لشبكة البورده.
+ */
+function ecm_rest_ota_app_catalog( $request ) {
+    $opts = ecm_ota_opts();
+    if ( empty( $opts['enabled'] ) ) {
+        return new WP_REST_Response( [ 'ok' => false, 'error' => 'ota_disabled' ], 503 );
+    }
+    if ( ! ecm_ota_throttle( 'catalog', 60, 600 ) ) {
+        return new WP_REST_Response( [ 'ok' => false, 'error' => 'too_many_requests' ], 429 );
+    }
+
+    $auth = ecm_ota_app_auth( $request );
+    if ( ! $auth['ok'] ) {
+        return new WP_REST_Response( [ 'ok' => false, 'error' => $auth['error'] ], 401 );
+    }
+    $subject = 'u:' . $auth['user']->ID;
+
+    global $wpdb;
+    $model = ecm_ota_slug( (string) $request->get_param( 'model' ) );
+    $depth = max( 1, min( 20, (int) $opts['catalog_depth'] ) );
+
+    $rows = $wpdb->get_results( $wpdb->prepare(
+        'SELECT * FROM ' . ecm_ota_releases_table() . ' WHERE model = %s AND active = 1',
+        $model
+    ) );
+
+    // أحدث N إصدار لكل قناة
+    $by_channel = [];
+    foreach ( (array) $rows as $r ) {
+        $by_channel[ $r->channel ][] = $r;
+    }
+    $out = [];
+    foreach ( $by_channel as $chan => $list ) {
+        usort( $list, function ( $a, $b ) {
+            return version_compare( $b->version, $a->version );
+        } );
+        foreach ( array_slice( $list, 0, $depth ) as $r ) {
+            if ( '' === ecm_ota_file_path( (string) $r->file_name ) ) {
+                continue; // ملف ناقص — مانعرضهوش للتطبيق أصلاً
+            }
+            $out[ $chan ][] = ecm_ota_release_payload( $r, $subject );
+        }
+    }
+
+    return rest_ensure_response( [
+        'ok'         => true,
+        'model'      => $model,
+        // (object) عشان الكتالوج الفاضي يطلع {} مش [] — التطبيق بيتوقّع map
+        'channels'   => (object) $out,
+        'link_ttl'   => (int) $opts['app_link_ttl'],
+        'check_in'   => (int) $opts['check_in'],
+        'server_time'=> time(),
+    ] );
+}
+
+/**
+ * GET /ecm/v1/ota/app/check?token=..&serial=..&version=..&model=..
+ * التطبيق بيسأل نيابةً عن بورده معيّنة قرأ منها السيريال والإصدار محليًا.
+ */
+function ecm_rest_ota_app_check( $request ) {
+    $opts = ecm_ota_opts();
+    if ( empty( $opts['enabled'] ) ) {
+        return new WP_REST_Response( [ 'ok' => false, 'update' => false, 'error' => 'ota_disabled' ], 503 );
+    }
+    if ( ! ecm_ota_throttle( 'app_check', 120, 600 ) ) {
+        return new WP_REST_Response( [ 'ok' => false, 'update' => false, 'error' => 'too_many_requests' ], 429 );
+    }
+
+    $auth = ecm_ota_app_auth( $request );
+    if ( ! $auth['ok'] ) {
+        return new WP_REST_Response( [ 'ok' => false, 'update' => false, 'error' => $auth['error'] ], 401 );
+    }
+    $user_id = (int) $auth['user']->ID;
+
+    $serial = function_exists( 'ecm_serial_normalize' )
+        ? ecm_serial_normalize( (string) $request->get_param( 'serial' ) )
+        : strtoupper( trim( (string) $request->get_param( 'serial' ) ) );
+
+    if ( '' === $serial ) {
+        return new WP_REST_Response( [ 'ok' => false, 'update' => false, 'error' => 'missing_serial' ], 400 );
+    }
+    if ( ! ecm_ota_user_owns_serial( $user_id, $serial ) ) {
+        return new WP_REST_Response( [ 'ok' => false, 'update' => false, 'error' => 'serial_not_yours' ], 403 );
+    }
+
+    $current = ecm_ota_clean_version( (string) $request->get_param( 'version' ) );
+    $model   = ecm_ota_slug( (string) $request->get_param( 'model' ) );
+    $channel = ecm_ota_slug( (string) $request->get_param( 'channel' ), 'stable' );
+    if ( ! isset( ecm_ota_channels()[ $channel ] ) ) {
+        $channel = 'stable';
+    }
+
+    global $wpdb;
+    $dev_table = ecm_ota_devices_table();
+    $device    = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$dev_table} WHERE serial = %s", $serial ) );
+
+    // القناة المثبّتة من اللوحة بتكسب اللي التطبيق طلبه
+    if ( $device && '' !== (string) $device->channel ) {
+        $channel = (string) $device->channel;
+    }
+
+    ecm_ota_touch_device( $serial, [
+        'chip_id'     => sanitize_text_field( (string) $request->get_param( 'chip' ) ),
+        'mac'         => sanitize_text_field( (string) $request->get_param( 'mac' ) ),
+        'model'       => $model,
+        'channel'     => $channel,
+        'fw_version'  => $current,
+        'via'         => 'app',
+        'app_user_id' => $user_id,
+        'local_ip'    => sanitize_text_field( (string) $request->get_param( 'local_ip' ) ),
+        'ip'          => ecm_ota_ip(),
+        'rssi'        => (int) $request->get_param( 'rssi' ),
+    ] );
+    $wpdb->query( $wpdb->prepare( "UPDATE {$dev_table} SET checks = checks + 1 WHERE serial = %s", $serial ) );
+
+    $res  = ecm_ota_resolve_update( $serial, $model, $channel, $current, $device );
+    $base = [
+        'ok'       => true,
+        'serial'   => $serial,
+        'version'  => $current,
+        'latest'   => $res['latest'],
+        'check_in' => (int) $opts['check_in'],
+        'message'  => $res['message'],
+    ];
+
+    if ( ! $res['update'] ) {
+        return rest_ensure_response( $base + [ 'update' => false ] );
+    }
+
+    return rest_ensure_response( $base + [
+        'update'   => true,
+        'pinned'   => (bool) ( $device && '' !== (string) $device->pin_version ),
+        'firmware' => ecm_ota_release_payload( $res['release'], 'u:' . $user_id ),
+    ] );
+}
+
+/**
+ * POST /ecm/v1/ota/app/report
+ * التطبيق بيبلّغ نيابةً عن البورده بعد ما يرفع عليها محليًا.
+ * params: token, serial, version, status (success|failed|updating), error, model, local_ip
+ */
+function ecm_rest_ota_app_report( $request ) {
+    if ( ! ecm_ota_throttle( 'app_report', 120, 600 ) ) {
+        return new WP_REST_Response( [ 'ok' => false, 'error' => 'too_many_requests' ], 429 );
+    }
+
+    $auth = ecm_ota_app_auth( $request );
+    if ( ! $auth['ok'] ) {
+        return new WP_REST_Response( [ 'ok' => false, 'error' => $auth['error'] ], 401 );
+    }
+    $user_id = (int) $auth['user']->ID;
+
+    $serial = function_exists( 'ecm_serial_normalize' )
+        ? ecm_serial_normalize( (string) $request->get_param( 'serial' ) )
+        : strtoupper( trim( (string) $request->get_param( 'serial' ) ) );
+
+    if ( '' === $serial ) {
+        return new WP_REST_Response( [ 'ok' => false, 'error' => 'missing_serial' ], 400 );
+    }
+    if ( ! ecm_ota_user_owns_serial( $user_id, $serial ) ) {
+        return new WP_REST_Response( [ 'ok' => false, 'error' => 'serial_not_yours' ], 403 );
+    }
+
+    return ecm_ota_record_report( $request, $serial, 'app', $user_id );
+}
+
+
+// ── §4.2  مسار البورده المباشر (احتياطي) ─────────────────────
+
+/**
+ * GET /ecm/v1/ota/check — للبوردات اللي ليها إنترنت.
  */
 function ecm_rest_ota_check( $request ) {
     $opts = ecm_ota_opts();
     if ( empty( $opts['enabled'] ) ) {
-        return new WP_REST_Response( [ 'ok' => false, 'update' => false, 'message' => 'OTA disabled' ], 503 );
+        return new WP_REST_Response( [ 'ok' => false, 'update' => false, 'error' => 'ota_disabled' ], 503 );
     }
-
     if ( ! ecm_ota_throttle( 'check', 40, 600 ) ) {
         return new WP_REST_Response( [ 'ok' => false, 'update' => false, 'error' => 'too_many_requests' ], 429 );
     }
@@ -435,8 +744,6 @@ function ecm_rest_ota_check( $request ) {
     global $wpdb;
     $dev_table = ecm_ota_devices_table();
     $device    = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$dev_table} WHERE serial = %s", $serial ) );
-
-    // القناة المثبّتة من اللوحة بتكسب اللي الجهاز طلبه
     if ( $device && '' !== (string) $device->channel ) {
         $channel = (string) $device->channel;
     }
@@ -447,73 +754,123 @@ function ecm_rest_ota_check( $request ) {
         'model'      => $model,
         'channel'    => $channel,
         'fw_version' => $current,
+        'via'        => 'device',
         'ip'         => ecm_ota_ip(),
         'rssi'       => (int) $request->get_param( 'rssi' ),
         'uptime'     => max( 0, (int) $request->get_param( 'uptime' ) ),
     ] );
     $wpdb->query( $wpdb->prepare( "UPDATE {$dev_table} SET checks = checks + 1 WHERE serial = %s", $serial ) );
 
-    $no_update = [
+    $res  = ecm_ota_resolve_update( $serial, $model, $channel, $current, $device );
+    $base = [
         'ok'       => true,
-        'update'   => false,
         'version'  => $current,
+        'latest'   => $res['latest'],
         'check_in' => (int) $opts['check_in'],
+        'message'  => $res['message'],
     ];
 
-    // إصدار مثبّت لجهاز بعينه — بيتجاوز القناة والطرح التدريجي (بيسمح كمان بالرجوع لنسخة أقدم)
-    $pinned = $device && '' !== (string) $device->pin_version;
-    $rel    = $pinned
-        ? ecm_ota_find_release( $model, (string) $device->pin_version )
-        : ecm_ota_latest_release( $model, $channel );
-
-    if ( ! $rel ) {
-        return rest_ensure_response( $no_update + [ 'message' => 'لا يوجد إصدار متاح لهذا الموديل' ] );
+    if ( ! $res['update'] ) {
+        return rest_ensure_response( $base + [ 'update' => false ] );
     }
 
-    if ( ! $pinned ) {
-        // نفس الإصدار أو أحدث — مفيش حاجة
-        if ( '' !== $current && version_compare( $current, $rel->version, '>=' ) ) {
-            return rest_ensure_response( $no_update + [ 'latest' => $rel->version, 'message' => 'الجهاز على أحدث إصدار' ] );
-        }
-        // حد أدنى للإصدار (تحديث على مرحلتين)
-        if ( '' !== (string) $rel->min_version && '' !== $current
-            && version_compare( $current, $rel->min_version, '<' ) ) {
-            return rest_ensure_response( $no_update + [
-                'latest'  => $rel->version,
-                'message' => 'لازم تحدّث للإصدار ' . $rel->min_version . ' الأول',
-            ] );
-        }
-        if ( ! ecm_ota_in_rollout( $serial, (int) $rel->id, (int) $rel->rollout ) ) {
-            return rest_ensure_response( $no_update + [ 'latest' => $rel->version, 'message' => 'خارج نسبة الطرح الحالية' ] );
-        }
-    } elseif ( $current !== '' && $current === $rel->version ) {
-        return rest_ensure_response( $no_update + [ 'latest' => $rel->version, 'message' => 'الجهاز على الإصدار المثبّت' ] );
-    }
-
-    if ( '' === ecm_ota_file_path( (string) $rel->file_name ) ) {
-        return rest_ensure_response( $no_update + [ 'message' => 'ملف الإصدار مفقود على السيرفر' ] );
-    }
-
-    return rest_ensure_response( [
-        'ok'        => true,
+    // array_merge مش "+" — عايزين قيم الإصدار الجديد تكسب مفاتيح $base
+    $rel = $res['release'];
+    return rest_ensure_response( array_merge( $base, [
         'update'    => true,
         'version'   => $rel->version,
-        'url'       => ecm_ota_sign_download( (int) $rel->id, $serial ),
+        'url'       => ecm_ota_sign_download( (int) $rel->id, 'd:' . $serial ),
         'md5'       => $rel->md5,
         'sha256'    => $rel->sha256,
         'size'      => (int) $rel->file_size,
         'mandatory' => (bool) $rel->mandatory,
         'notes'     => (string) $rel->notes,
         'channel'   => $rel->channel,
-        'pinned'    => (bool) $pinned,
-        'check_in'  => (int) $opts['check_in'],
-        'message'   => 'تحديث متاح',
-    ] );
+        'pinned'    => (bool) ( $device && '' !== (string) $device->pin_version ),
+    ] ) );
 }
+
+/** POST /ecm/v1/ota/report — للبوردات اللي ليها إنترنت */
+function ecm_rest_ota_report( $request ) {
+    if ( ! ecm_ota_throttle( 'report', 60, 600 ) ) {
+        return new WP_REST_Response( [ 'ok' => false, 'error' => 'too_many_requests' ], 429 );
+    }
+    $auth = ecm_ota_authenticate( $request );
+    if ( ! $auth['ok'] ) {
+        return new WP_REST_Response( [ 'ok' => false, 'error' => $auth['error'] ], 401 );
+    }
+    return ecm_ota_record_report( $request, $auth['serial'], 'device', 0 );
+}
+
+
+// ── §4.3  تسجيل التقرير (مشترك) ──────────────────────────────
+
+/** المنطق المشترك لتسجيل نتيجة التحديث */
+function ecm_ota_record_report( $request, string $serial, string $via, int $user_id ) {
+    global $wpdb;
+
+    $status = sanitize_key( (string) $request->get_param( 'status' ) );
+    if ( ! in_array( $status, [ 'success', 'failed', 'updating', 'idle' ], true ) ) {
+        $status = 'idle';
+    }
+    $version = ecm_ota_clean_version( (string) $request->get_param( 'version' ) );
+    $error   = sanitize_text_field( (string) $request->get_param( 'error' ) );
+
+    $fields = [
+        'status'     => $status,
+        'last_error' => 'failed' === $status ? substr( $error, 0, 190 ) : '',
+        'via'        => $via,
+        'ip'         => ecm_ota_ip(),
+    ];
+    if ( $user_id ) {
+        $fields['app_user_id'] = $user_id;
+    }
+    if ( '' !== $version ) {
+        $fields['fw_version'] = $version;
+    }
+    $local_ip = sanitize_text_field( (string) $request->get_param( 'local_ip' ) );
+    if ( '' !== $local_ip ) {
+        $fields['local_ip'] = $local_ip;
+    }
+    ecm_ota_touch_device( $serial, $fields );
+
+    // عدّاد نجاح/فشل الإصدار + فكّ التثبيت بعد ما البورده توصل للإصدار المثبّت
+    if ( '' !== $version && in_array( $status, [ 'success', 'failed' ], true ) ) {
+        $col   = 'success' === $status ? 'success_count' : 'fail_count';
+        $model = ecm_ota_slug( (string) $request->get_param( 'model' ) );
+        if ( 'default' === $model ) {
+            // مابعتش موديل — ناخده من سجل البورده عشان مانعدّش على إصدار موديل تاني
+            $known = (string) $wpdb->get_var( $wpdb->prepare(
+                'SELECT model FROM ' . ecm_ota_devices_table() . ' WHERE serial = %s',
+                $serial
+            ) );
+            if ( '' !== $known ) {
+                $model = $known;
+            }
+        }
+        $wpdb->query( $wpdb->prepare(
+            'UPDATE ' . ecm_ota_releases_table() . " SET {$col} = {$col} + 1 WHERE version = %s AND model = %s",
+            $version,
+            $model
+        ) );
+        if ( 'success' === $status ) {
+            $wpdb->query( $wpdb->prepare(
+                'UPDATE ' . ecm_ota_devices_table() . " SET pin_version = '' WHERE serial = %s AND pin_version = %s",
+                $serial,
+                $version
+            ) );
+        }
+    }
+
+    return rest_ensure_response( [ 'ok' => true, 'serial' => $serial, 'status' => $status ] );
+}
+
+
+// ── §4.4  التنزيل ────────────────────────────────────────────
 
 /**
  * GET /ecm/v1/ota/download?r=..&s=..&e=..&k=..
- * بيرمي الملف نفسه مع هيدر x-MD5 اللي مكتبة httpUpdate بتتحقق بيه.
+ * بيرمي ملف الـ .bin مع هيدر x-MD5، وبيدعم الاستكمال (Range) عشان شبكة الموبايل.
  */
 function ecm_rest_ota_download( $request ) {
     $v = ecm_ota_verify_download( $request );
@@ -535,18 +892,50 @@ function ecm_rest_ota_download( $request ) {
         return new WP_REST_Response( [ 'ok' => false, 'error' => 'file_missing' ], 404 );
     }
 
-    ecm_ota_touch_device( $v['serial'], [ 'status' => 'updating', 'ip' => ecm_ota_ip() ] );
-    $wpdb->query( $wpdb->prepare(
-        'UPDATE ' . ecm_ota_releases_table() . ' SET downloads = downloads + 1 WHERE id = %d',
-        (int) $rel->id
-    ) );
+    $size    = (int) filesize( $path );
+    $subject = (string) $v['subject'];
+
+    // بورده بتنزّل لنفسها → نعلّم إنها بتتحدّث. التطبيق بينزّل بس — التقرير بييجي بعدين.
+    if ( 0 === strpos( $subject, 'd:' ) ) {
+        ecm_ota_touch_device( substr( $subject, 2 ), [ 'status' => 'updating', 'via' => 'device', 'ip' => ecm_ota_ip() ] );
+    }
+
+    // ── الاستكمال (Range) ──
+    $start = 0;
+    $end   = $size - 1;
+    $range = isset( $_SERVER['HTTP_RANGE'] ) ? (string) wp_unslash( $_SERVER['HTTP_RANGE'] ) : '';
+    $partial = false;
+    if ( $range && preg_match( '/bytes=(\d*)-(\d*)/', $range, $m ) ) {
+        $r_start = ( '' !== $m[1] ) ? (int) $m[1] : 0;
+        $r_end   = ( '' !== $m[2] ) ? (int) $m[2] : $size - 1;
+        if ( $r_start <= $r_end && $r_start < $size ) {
+            $start   = $r_start;
+            $end     = min( $r_end, $size - 1 );
+            $partial = true;
+        }
+    }
+    $length = $end - $start + 1;
+
+    // عدّاد التنزيل — للطلب الكامل أو أول جزء بس، عشان مانعدّش كل chunk
+    if ( 0 === $start ) {
+        $wpdb->query( $wpdb->prepare(
+            'UPDATE ' . ecm_ota_releases_table() . ' SET downloads = downloads + 1 WHERE id = %d',
+            (int) $rel->id
+        ) );
+    }
 
     nocache_headers();
     header( 'Content-Type: application/octet-stream' );
-    header( 'Content-Length: ' . filesize( $path ) );
+    header( 'Accept-Ranges: bytes' );
+    header( 'Content-Length: ' . $length );
     header( 'Content-Disposition: attachment; filename="' . basename( $path ) . '"' );
-    header( 'x-MD5: ' . $rel->md5 );          // ESP8266/ESP32 httpUpdate بيقرا الهيدر ده
+    header( 'x-MD5: ' . $rel->md5 );          // مكتبة httpUpdate بتقرا الهيدر ده
     header( 'x-ECM-Version: ' . $rel->version );
+    header( 'x-ECM-SHA256: ' . $rel->sha256 );
+    if ( $partial ) {
+        status_header( 206 );
+        header( "Content-Range: bytes {$start}-{$end}/{$size}" );
+    }
 
     if ( 'HEAD' === $request->get_method() ) {
         exit;
@@ -558,78 +947,35 @@ function ecm_rest_ota_download( $request ) {
     while ( ob_get_level() ) {
         ob_end_clean();
     }
-    readfile( $path );
+
+    $fp = fopen( $path, 'rb' );
+    if ( ! $fp ) {
+        exit;
+    }
+    fseek( $fp, $start );
+    $remaining = $length;
+    while ( $remaining > 0 && ! feof( $fp ) ) {
+        $chunk = fread( $fp, (int) min( 262144, $remaining ) );
+        if ( false === $chunk || '' === $chunk ) {
+            break;
+        }
+        echo $chunk; // phpcs:ignore WordPress.Security.EscapeOutput
+        flush();
+        $remaining -= strlen( $chunk );
+    }
+    fclose( $fp );
     exit;
 }
 
-/**
- * POST /ecm/v1/ota/report
- * params: serial, token, version, status (success|failed|updating), error
- */
-function ecm_rest_ota_report( $request ) {
-    if ( ! ecm_ota_throttle( 'report', 60, 600 ) ) {
-        return new WP_REST_Response( [ 'ok' => false, 'error' => 'too_many_requests' ], 429 );
-    }
-    $auth = ecm_ota_authenticate( $request );
-    if ( ! $auth['ok'] ) {
-        return new WP_REST_Response( [ 'ok' => false, 'error' => $auth['error'] ], 401 );
-    }
 
-    $status = sanitize_key( (string) $request->get_param( 'status' ) );
-    if ( ! in_array( $status, [ 'success', 'failed', 'updating', 'idle' ], true ) ) {
-        $status = 'idle';
-    }
-    $version = ecm_ota_clean_version( (string) $request->get_param( 'version' ) );
-    $error   = sanitize_text_field( (string) $request->get_param( 'error' ) );
+// ── §4.5  الأسطول ────────────────────────────────────────────
 
-    $fields = [
-        'status'     => $status,
-        'last_error' => 'failed' === $status ? substr( $error, 0, 190 ) : '',
-        'ip'         => ecm_ota_ip(),
-    ];
-    if ( '' !== $version ) {
-        $fields['fw_version'] = $version;
-    }
-    ecm_ota_touch_device( $auth['serial'], $fields );
-
-    // عدّاد نجاح/فشل الإصدار + فكّ التثبيت بعد ما الجهاز يوصل للإصدار المثبّت
-    if ( '' !== $version && in_array( $status, [ 'success', 'failed' ], true ) ) {
-        global $wpdb;
-        $col   = 'success' === $status ? 'success_count' : 'fail_count';
-        $model = ecm_ota_slug( (string) $request->get_param( 'model' ) );
-        if ( 'default' === $model ) {
-            // مابعتش موديل — ناخده من سجل الجهاز نفسه عشان مانعدّش على إصدار موديل تاني
-            $known = (string) $wpdb->get_var( $wpdb->prepare(
-                'SELECT model FROM ' . ecm_ota_devices_table() . ' WHERE serial = %s',
-                $auth['serial']
-            ) );
-            if ( '' !== $known ) {
-                $model = $known;
-            }
-        }
-        $wpdb->query( $wpdb->prepare(
-            'UPDATE ' . ecm_ota_releases_table() . " SET {$col} = {$col} + 1 WHERE version = %s AND model = %s",
-            $version,
-            $model
-        ) );
-        if ( 'success' === $status ) {
-            $wpdb->query( $wpdb->prepare(
-                'UPDATE ' . ecm_ota_devices_table() . " SET pin_version = '' WHERE serial = %s AND pin_version = %s",
-                $auth['serial'],
-                $version
-            ) );
-        }
-    }
-
-    return rest_ensure_response( [ 'ok' => true, 'status' => $status ] );
-}
-
-/** GET /ecm/v1/ota/fleet — للوحة/التطبيق */
+/** GET /ecm/v1/ota/fleet — للوحة/التقارير */
 function ecm_rest_ota_fleet( $request ) {
     global $wpdb;
     $limit = min( 500, max( 1, (int) $request->get_param( 'limit' ) ?: 100 ) );
     $rows  = $wpdb->get_results( $wpdb->prepare(
-        'SELECT serial, model, channel, fw_version, pin_version, status, last_error, rssi, last_seen, checks
+        'SELECT serial, model, channel, fw_version, pin_version, status, last_error, via, local_ip, rssi, last_seen, checks
          FROM ' . ecm_ota_devices_table() . ' ORDER BY last_seen DESC LIMIT %d',
         $limit
     ), ARRAY_A );
