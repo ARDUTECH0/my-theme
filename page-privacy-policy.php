@@ -29,6 +29,15 @@ $effective_date = [ 'ar' => '17 سبتمبر 2026', 'en' => 'September 17, 2026'
 $version        = '1.0';
 $contact_email  = 'privacy@ecameraman.com';
 
+$deletion_page = function_exists( 'ecm_page_by_title' ) ? ecm_page_by_title( 'حذف الحساب والبيانات' ) : null;
+$deletion_url  = $deletion_page ? esc_url( get_permalink( $deletion_page->ID ) ) : '';
+$deletion_link_ar = $deletion_url
+    ? ' تقدر كمان تزور <a href="' . $deletion_url . '">صفحة حذف الحساب والبيانات</a> لتفاصيل أكتر.'
+    : '';
+$deletion_link_en = $deletion_url
+    ? ' You can also visit the <a href="' . $deletion_url . '">Account &amp; Data Deletion page</a> for more details.'
+    : '';
+
 // ── الأقسام: كل قسم بعنوان ومحتوى بالعربي والإنجليزي ──
 $sections = [
     [
@@ -146,10 +155,10 @@ $sections = [
     [
         'id' => '09',
         'ar' => [ 'title' => 'حقوقك', 'body' =>
-            '<p>يمكنك في أي وقت طلب الاطّلاع على بياناتك، تصحيحها، أو حذف حسابك بالكامل من خوادمنا، بالتواصل معنا عبر البيانات أدناه.</p>',
+            '<p>يمكنك في أي وقت طلب الاطّلاع على بياناتك، تصحيحها، أو حذف حسابك بالكامل من خوادمنا، بالتواصل معنا عبر البيانات أدناه.' . $deletion_link_ar . '</p>',
         ],
         'en' => [ 'title' => 'Your Rights', 'body' =>
-            '<p>You may at any time request to access your data, correct it, or delete your account entirely from our servers, by contacting us using the details below.</p>',
+            '<p>You may at any time request to access your data, correct it, or delete your account entirely from our servers, by contacting us using the details below.' . $deletion_link_en . '</p>',
         ],
     ],
     [
