@@ -31,7 +31,7 @@ function ecm_page_by_title( $title ) {
 function ecm_ensure_pages() {
     // لو الأدمن مش داخل — لا تشغّل
     if ( ! is_admin() && ! wp_doing_cron() ) return;
-    if ( get_option( 'ecm_pages_created_v7' ) ) return;
+    if ( get_option( 'ecm_pages_created_v8' ) ) return;
 
     // ── صفحة رئيسية ──
     $front_page = ecm_page_by_title( 'ECM Home' );
@@ -130,6 +130,24 @@ function ecm_ensure_pages() {
         update_post_meta( $support_page->ID, '_wp_page_template', 'page-support.php' );
     }
 
+    // ── صفحة سياسة الخصوصية (ثنائية اللغة — لرابط Google Play) ──
+    // slug ثابت بالإنجليزي (privacy-policy) عشان يبقى رابط نضيف يتحط في Play Console
+    $privacy_page = ecm_page_by_title( 'سياسة الخصوصية' );
+    if ( ! $privacy_page ) {
+        $privacy_page_id = wp_insert_post( [
+            'post_title'   => 'سياسة الخصوصية',
+            'post_name'    => 'privacy-policy',
+            'post_content' => '',
+            'post_status'  => 'publish',
+            'post_type'    => 'page',
+        ] );
+        if ( $privacy_page_id && ! is_wp_error( $privacy_page_id ) ) {
+            update_post_meta( $privacy_page_id, '_wp_page_template', 'page-privacy-policy.php' );
+        }
+    } else {
+        update_post_meta( $privacy_page->ID, '_wp_page_template', 'page-privacy-policy.php' );
+    }
+
     // ── صفحات الأنظمة (الكاميرا / المركبة / المفاتيح) ──
     $system_pages = [
         'التحكم في الكاميرا'  => 'page-camera-control.php',
@@ -155,13 +173,13 @@ function ecm_ensure_pages() {
         }
     }
 
-    update_option( 'ecm_pages_created_v7', true );
+    update_option( 'ecm_pages_created_v8', true );
 }
 add_action( 'init', 'ecm_ensure_pages' );
 
 // لو فعّل الثيم من جديد — أعد الإنشاء
 function ecm_theme_activate() {
-    delete_option( 'ecm_pages_created_v7' );
+    delete_option( 'ecm_pages_created_v8' );
 }
 add_action( 'after_switch_theme', 'ecm_theme_activate' );
 
@@ -177,6 +195,7 @@ function ecm_get_expected_pages() {
         [ 'السوفت وير والتحديثات',   'page-software.php',         false ],
         [ 'رفع السوفت وير المباشر',  'page-upload-software.php',  false ],
         [ 'الدعم الفني',            'page-support.php',          false ],
+        [ 'سياسة الخصوصية',         'page-privacy-policy.php',   false ],
         [ 'التحكم في الكاميرا',     'page-camera-control.php',   false ],
         [ 'التحكم في المركبة',      'page-vehicle-control.php',  false ],
         [ 'لوحة المفاتيح',          'page-relay-panel.php',      false ],
@@ -263,7 +282,7 @@ function ecm_handle_rebuild_pages() {
     }
     check_admin_referer( 'ecm_rebuild_pages_nonce' );
 
-    delete_option( 'ecm_pages_created_v7' );
+    delete_option( 'ecm_pages_created_v8' );
     ecm_ensure_pages(); // بيعمل الناقص بس — مش بيلمس الموجود
 
     wp_safe_redirect( admin_url( 'admin.php?page=ecm-dashboard&ecm_pages_rebuilt=1' ) );
@@ -378,7 +397,7 @@ add_action( 'wp_enqueue_scripts', 'ecm_enqueue_assets' );
 
 
 // ── THEME VERSION CONSTANT ───────────────────────────────────
-define( 'ECM_VERSION', '3.0.73' );
+define( 'ECM_VERSION', '3.0.74' );
 
 
 // ── INCLUDE: FRONT PAGE CUSTOMIZER ──────────────────────────

@@ -46,10 +46,12 @@ if ( ! function_exists( 'elementor_theme_do_location' ) || ! elementor_theme_do_
                 'container'      => false,
                 'depth'          => 1,
                 'fallback_cb'    => function () {
+                    $privacy     = function_exists( 'ecm_page_by_title' ) ? ecm_page_by_title( 'سياسة الخصوصية' ) : null;
+                    $privacy_url = $privacy ? esc_url( get_permalink( $privacy->ID ) ) : '#';
                     echo '<ul class="ecm-footer-links">
                         <li><a href="#">عن المنتج</a></li>
                         <li><a href="#">الدعم</a></li>
-                        <li><a href="#">الخصوصية</a></li>
+                        <li><a href="' . $privacy_url . '">الخصوصية</a></li>
                     </ul>';
                 },
             ] );
